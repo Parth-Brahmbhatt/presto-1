@@ -25,6 +25,8 @@ import static io.airlift.configuration.testing.ConfigAssertions.assertFullMappin
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
+import static io.airlift.units.DataSize.Unit.TERABYTE;
 
 public class TestQueryManagerConfig
 {
@@ -53,7 +55,8 @@ public class TestQueryManagerConfig
                 .setQueryMaxCpuTime(new Duration(1_000_000_000, TimeUnit.DAYS))
                 .setQueryMaxScanPhysicalBytes(null)
                 .setRequiredWorkers(1)
-                .setRequiredWorkersMaxWait(new Duration(5, TimeUnit.MINUTES)));
+                .setRequiredWorkersMaxWait(new Duration(5, TimeUnit.MINUTES))
+                .setQueryMaxDataSize(new DataSize(100, TERABYTE)));
     }
 
     @Test
@@ -82,6 +85,7 @@ public class TestQueryManagerConfig
                 .put("query.max-scan-physical-bytes", "1kB")
                 .put("query-manager.required-workers", "333")
                 .put("query-manager.required-workers-max-wait", "33m")
+                .put("query.max-data-size", "10GB")
                 .build();
 
         QueryManagerConfig expected = new QueryManagerConfig()
@@ -106,7 +110,8 @@ public class TestQueryManagerConfig
                 .setQueryMaxCpuTime(new Duration(2, TimeUnit.DAYS))
                 .setQueryMaxScanPhysicalBytes(DataSize.of(1, KILOBYTE))
                 .setRequiredWorkers(333)
-                .setRequiredWorkersMaxWait(new Duration(33, TimeUnit.MINUTES));
+                .setRequiredWorkersMaxWait(new Duration(33, TimeUnit.MINUTES))
+                .setQueryMaxDataSize(new DataSize(10, GIGABYTE));
 
         assertFullMapping(properties, expected);
     }

@@ -28,6 +28,8 @@ import javax.validation.constraints.NotNull;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import static io.airlift.units.DataSize.Unit.TERABYTE;
+
 @DefunctConfig({
         "query.max-pending-splits-per-node",
         "query.queue-config-file",
@@ -63,6 +65,7 @@ public class QueryManagerConfig
     private Duration queryMaxExecutionTime = new Duration(100, TimeUnit.DAYS);
     private Duration queryMaxCpuTime = new Duration(1_000_000_000, TimeUnit.DAYS);
     private Optional<DataSize> queryMaxScanPhysicalBytes = Optional.empty();
+    private DataSize maxQueryDataSize = new DataSize(100, TERABYTE);
 
     private int requiredWorkers = 1;
     private Duration requiredWorkersMaxWait = new Duration(5, TimeUnit.MINUTES);
@@ -362,6 +365,18 @@ public class QueryManagerConfig
     public QueryManagerConfig setRequiredWorkersMaxWait(Duration requiredWorkersMaxWait)
     {
         this.requiredWorkersMaxWait = requiredWorkersMaxWait;
+        return this;
+    }
+    @NotNull
+    public DataSize getQueryMaxDataSize()
+    {
+        return maxQueryDataSize;
+    }
+
+    @Config("query.max-data-size")
+    public QueryManagerConfig setQueryMaxDataSize(DataSize maxQueryDataSize)
+    {
+        this.maxQueryDataSize = maxQueryDataSize;
         return this;
     }
 }

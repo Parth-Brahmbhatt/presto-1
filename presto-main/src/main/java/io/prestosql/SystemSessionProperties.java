@@ -45,6 +45,9 @@ import static io.prestosql.spi.session.PropertyMetadata.*;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.NONE;
 import static java.lang.Math.min;
 import static java.lang.String.format;
 
@@ -130,6 +133,7 @@ public final class SystemSessionProperties
     public static final String REQUIRED_WORKERS_MAX_WAIT_TIME = "required_workers_max_wait_time";
     public static final String COST_ESTIMATION_WORKER_COUNT = "cost_estimation_worker_count";
     public static final String OMIT_DATETIME_TYPE_PRECISION = "omit_datetime_type_precision";
+    public static final String QUERY_MAX_DATA_SIZE = "query_max_data_size";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -571,6 +575,15 @@ public final class SystemSessionProperties
                         "Omit precision when rendering datetime type names with default precision",
                         featuresConfig.isOmitDateTimeTypePrecision(),
                         false));
+                new PropertyMetadata<>(
+                        QUERY_MAX_DATA_SIZE,
+                        "Maximum data size of a query",
+                        VARCHAR,
+                        DataSize.class,
+                        queryManagerConfig.getQueryMaxDataSize(),
+                        true,
+                        value -> DataSize.valueOf((String) value),
+                        DataSize::toString);
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -1021,5 +1034,10 @@ public final class SystemSessionProperties
     public static boolean isOmitDateTimeTypePrecision(Session session)
     {
         return session.getSystemProperty(OMIT_DATETIME_TYPE_PRECISION, Boolean.class);
+    }
+
+    public static DataSize getQueryMaxDataSize(Session session)
+    {
+        return session.getSystemProperty(QUERY_MAX_DATA_SIZE, DataSize.class);
     }
 }

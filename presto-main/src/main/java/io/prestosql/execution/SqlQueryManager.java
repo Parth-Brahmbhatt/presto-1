@@ -20,8 +20,10 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.ExceededCpuLimitException;
+import io.prestosql.ExceededDataSizeLimitException;
 import io.prestosql.ExceededScanLimitException;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryExecution.QueryOutputInfo;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.memory.ClusterMemoryManager;
@@ -54,6 +56,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.SystemSessionProperties.getQueryMaxCpuTime;
 import static io.prestosql.SystemSessionProperties.getQueryMaxScanPhysicalBytes;
+import static io.prestosql.SystemSessionProperties.getQueryMaxDataSize;
 import static io.prestosql.execution.QueryState.RUNNING;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.lang.String.format;
@@ -119,6 +122,13 @@ public class SqlQueryManager
             }
             catch (Throwable e) {
                 log.error(e, "Error enforcing query scan bytes limits");
+            }
+
+            try {
+                enforceQueryMaxDataSizeLimits();
+            }
+            catch (Throwable e) {
+                log.warn(e, "Error enforcing query driver number limits");
             }
         }, 1, 1, TimeUnit.SECONDS);
     }
@@ -325,6 +335,23 @@ public class SqlQueryManager
                     query.fail(new ExceededScanLimitException(limit));
                 }
             });
+        }
+    }
+
+    /**
+     * Enforce max data size at the query level
+     */
+    public void enforceQueryMaxDataSizeLimits()
+    {
+        for (QueryExecution query : queryTracker.getAllQueries()) {
+            if (query.getQueryInfo().getState().isDone()) {
+                continue;
+            }
+            DataSize queryMaxDataSize = getQueryMaxDataSize(query.getSession());
+            DataSize rawInputDataSize = query.getQueryInfo().getQueryStats().getRawInputDataSize();
+            if (queryMaxDataSize.compareTo(rawInputDataSize) < 0) {
+                query.fail(new ExceededDataSizeLimitException(queryMaxDataSize));
+            }
         }
     }
 }
