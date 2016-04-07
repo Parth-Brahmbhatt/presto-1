@@ -156,6 +156,7 @@
         <module>presto-tpcds</module>
         <module>presto-tpch</module>
         <module>presto-verifier</module>
+        <module>presto-netflix</module>
     </modules>
 
     <repositories>
