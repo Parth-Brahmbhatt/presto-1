@@ -20,8 +20,11 @@ import io.airlift.compress.lzo.LzoDecompressor;
 import io.airlift.compress.snappy.SnappyDecompressor;
 import io.airlift.compress.zstd.ZstdDecompressor;
 import io.airlift.slice.Slice;
+import org.apache.hadoop.io.compress.BrotliCodec;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.zip.GZIPInputStream;
 
@@ -54,6 +57,8 @@ public final class ParquetCompressionUtils
                 return decompressGzip(input, uncompressedSize);
             case SNAPPY:
                 return decompressSnappy(input, uncompressedSize);
+            case BROTLI:
+                return decompressBrotli(input, uncompressedSize);
             case UNCOMPRESSED:
                 return input;
             case LZO:
@@ -79,6 +84,21 @@ public final class ParquetCompressionUtils
         byte[] buffer = new byte[uncompressedSize];
         decompress(new ZstdDecompressor(), input, 0, input.length(), buffer, 0);
         return wrappedBuffer(buffer);
+    }
+
+    private static Slice decompressBrotli(Slice input, int uncompressedSize)
+            throws IOException
+    {
+        ByteArrayOutputStream uncompressedStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[uncompressedSize];
+        BrotliCodec codec = new BrotliCodec();
+        try (InputStream brotliInputStream = codec.createInputStream(new ByteArrayInputStream(input.getBytes()))) {
+            int bytesRead;
+            while ((bytesRead = brotliInputStream.read(buffer)) != -1) {
+                uncompressedStream.write(buffer, 0, bytesRead);
+            }
+            return wrappedBuffer(uncompressedStream.toByteArray());
+        }
     }
 
     private static Slice decompressGzip(Slice input, int uncompressedSize)

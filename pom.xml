@@ -1555,6 +1555,13 @@
                 <artifactId>snakeyaml</artifactId>
                 <version>1.26</version>
             </dependency>
+
+            <!-- NETFLIX ONLY DEPENDENCIES -->
+            <dependency>
+                <groupId>netflix</groupId>
+                <artifactId>brotli-codec</artifactId>
+                <version>0.1.8</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
