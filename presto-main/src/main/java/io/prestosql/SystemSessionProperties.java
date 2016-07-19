@@ -134,6 +134,11 @@ public final class SystemSessionProperties
     public static final String COST_ESTIMATION_WORKER_COUNT = "cost_estimation_worker_count";
     public static final String OMIT_DATETIME_TYPE_PRECISION = "omit_datetime_type_precision";
     public static final String QUERY_MAX_DATA_SIZE = "query_max_data_size";
+    private static final String GENIE_JOB_ID = "genie_job_id";
+    private static final String GENIE_JOB_NAME = "genie_job_name";
+    private static final String GENIE_ENVIRONMENT = "genie_environment";
+    private static final String GENIE_STACK = "genie_stack";
+    private static final String GENIE_VERSION = "genie_version";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -583,7 +588,32 @@ public final class SystemSessionProperties
                         queryManagerConfig.getQueryMaxDataSize(),
                         true,
                         value -> DataSize.valueOf((String) value),
-                        DataSize::toString);
+                        DataSize::toString),
+                stringProperty(
+                        GENIE_JOB_ID,
+                        "Genie job id used for metric collection",
+                        "",
+                        true),
+                stringProperty(
+                        GENIE_JOB_NAME,
+                        "Genie job name used for metric collection",
+                        "",
+                        true),
+                stringProperty(
+                        GENIE_ENVIRONMENT,
+                        "Genie Netflix environment the query ran in",
+                        "",
+                        true),
+                stringProperty(
+                        GENIE_STACK,
+                        "Genie Netflix stack the query ran in",
+                        "",
+                        true),
+                stringProperty(
+                        GENIE_VERSION,
+                        "Genie version",
+                        "",
+                        true));
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
