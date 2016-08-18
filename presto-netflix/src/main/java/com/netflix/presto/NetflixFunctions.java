@@ -13,38 +13,51 @@
  */
 package com.netflix.presto;
 
-import io.prestosql.spi.connector.ConnectorSession;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPathException;
+import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
+import com.jayway.jsonpath.spi.json.JsonProvider;
+import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import com.jayway.jsonpath.spi.mapper.MappingProvider;
+import io.airlift.json.ObjectMapperProvider;
+import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.Description;
 import io.prestosql.spi.function.ScalarFunction;
 import io.prestosql.spi.function.SqlNullable;
 import io.prestosql.spi.function.SqlType;
 import io.prestosql.spi.type.StandardTypes;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.annotations.VisibleForTesting;
-
-import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS;
+import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.type.StandardTypes.BIGINT;
+import static io.prestosql.spi.type.StandardTypes.JSON;
 import static io.prestosql.spi.type.StandardTypes.VARCHAR;
-import static io.airlift.slice.Slices.utf8Slice;
 import static java.util.Calendar.DAY_OF_MONTH;
 import static java.util.Calendar.HOUR_OF_DAY;
 import static java.util.Calendar.MONTH;
@@ -57,6 +70,35 @@ import static java.util.Objects.requireNonNull;
 public final class NetflixFunctions
 {
     private static final int SECONDS_PER_DAY = 86_400;
+
+    private static final ObjectMapper SORTED_MAPPER = new ObjectMapperProvider().get().configure(ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+    private static final int ESTIMATED_JSON_OUTPUT_SIZE = 512;
+
+    static {
+        Configuration.setDefaults(new Configuration.Defaults() {
+            private final JsonProvider jsonProvider = new JacksonJsonProvider(SORTED_MAPPER);
+            private final MappingProvider mappingProvider = new JacksonMappingProvider();
+
+            @Override
+            public JsonProvider jsonProvider()
+            {
+                return jsonProvider;
+            }
+
+            @Override
+            public MappingProvider mappingProvider()
+            {
+                return mappingProvider;
+            }
+
+            @Override
+            public Set<Option> options()
+            {
+                return EnumSet.noneOf(Option.class);
+            }
+        });
+    }
 
     private NetflixFunctions()
     {
@@ -319,5 +361,35 @@ public final class NetflixFunctions
             }
             return matches.toArray(new String[matches.size()]);
         }
+    }
+
+    @ScalarFunction("jsonp_extract")
+    @SqlNullable
+    @SqlType(JSON)
+    public static Slice varcharExtractJson(@SqlType(VARCHAR) Slice json, @SqlType(VARCHAR) Slice jsonPath)
+            throws IOException
+    {
+        // handle null jsons similar to the current json_extract implementation
+        if (json.toStringUtf8().equals("null")) {
+            return utf8Slice("null");
+        }
+
+        try (DynamicSliceOutput dynamicSliceOutput = new DynamicSliceOutput(ESTIMATED_JSON_OUTPUT_SIZE)) {
+            Object pojo = com.jayway.jsonpath.JsonPath.read(json.getInput(), jsonPath.toStringUtf8());
+            SORTED_MAPPER.writeValue((OutputStream) dynamicSliceOutput, pojo);
+            return dynamicSliceOutput.slice();
+        }
+        catch (JsonPathException jsonPathException) {
+            return null;
+        }
+    }
+
+    @ScalarFunction("jsonp_extract")
+    @SqlNullable
+    @SqlType(JSON)
+    public static Slice extractJson(@SqlType(JSON) Slice json, @SqlType(VARCHAR) Slice jsonPath)
+            throws IOException
+    {
+        return varcharExtractJson(json, jsonPath);
     }
 }

@@ -13,17 +13,21 @@
  */
 package com.netflix.presto;
 
+import io.airlift.slice.Slice;
 import io.prestosql.operator.scalar.AbstractTestFunctions;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
-import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import java.io.IOException;
+
 import static com.netflix.presto.NetflixFunctions.addHoursToDateint;
 import static com.netflix.presto.NetflixFunctions.dateDiff;
 import static com.netflix.presto.NetflixFunctions.dateSub;
+import static com.netflix.presto.NetflixFunctions.extractJson;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
+import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static org.testng.Assert.assertEquals;
 
 public class TestNetflixFunctions
@@ -34,6 +38,12 @@ public class TestNetflixFunctions
     {
         functionAssertions.addFunctions(extractFunctions(new NetflixPlugin().getFunctions()));
     }
+
+    private static final String JSON = "{\"store\": {\"book\": [{\"category\": \"reference\",\"author\": \"Nigel Rees\",\"title\": \"Sayings of the Century\",\"price\": 8.95}, " +
+            "{\"category\": \"fiction\",\"author\": \"Evelyn Waugh\",\"title\": \"Sword of Honour\",\"price\": 12.99}," +
+            " {\"category\": \"fiction\",\"author\": \"Herman Melville\",\"title\": \"Moby Dick\",\"isbn\": \"0-553-21311-3\",\"price\": 8.99}, " +
+            "{\"category\": \"fiction\",\"author\": \"J. R. R. Tolkien\",\"title\": \"The Lord of the Rings\",\"isbn\": \"0-395-19395-8\",\"price\": 22.99}]," +
+            "\"object\": {\"inner_object\": {\"array\": [{\"inner_array\": [{\"x\": \"y\"}]}]}}}}";
 
     @Test
     public void testDateSub()
@@ -100,5 +110,23 @@ public class TestNetflixFunctions
         assertEquals(res[0], "a");
         assertEquals(res[1], "b,c,d,e");
         assertEquals(res[2], "f;g;h");
+    }
+
+    public void testJsonExtract()
+            throws IOException
+    {
+        assertJsonExtract(JSON, "$..book.length()", "[4]");
+        assertJsonExtract(JSON, "$.store.object.inner_object.array[0].inner_array[0].x", "\"y\"");
+        assertJsonExtract(JSON, "$.store.book[*].category", "[\"reference\",\"fiction\",\"fiction\",\"fiction\"]");
+        assertJsonExtract(JSON, "$.store.bicycle.price", null);
+        assertJsonExtract("{\"s\":}", "$", null);
+    }
+
+    private void assertJsonExtract(String json, String jsonPath, String expected)
+            throws IOException
+    {
+        Slice result = extractJson(utf8Slice(json), utf8Slice(jsonPath));
+        String actual = result == null ? null : result.toStringUtf8();
+        assertEquals(actual, expected);
     }
 }
