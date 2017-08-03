@@ -396,9 +396,12 @@ public class ThriftHiveMetastore
                     .stopOn(NoSuchObjectException.class, HiveViewNotSupportedException.class)
                     .stopOnIllegalExceptions()
                     .run("getTableColumnStatistics", stats.getGetTableColumnStatistics().wrap(() -> {
-                        try (ThriftMetastoreClient client = createMetastoreClient(identity)) {
-                            return groupStatisticsByColumn(client.getTableColumnStatistics(databaseName, tableName, columns), rowCount);
-                        }
+                        // metacat does not implement getTableColumnStatistics and we do not have the column level stats
+                       // try (HiveMetastoreClient client = clientProvider.createMetastoreClient()) {
+                       //     return groupStatisticsByColumn(client.getTableColumnStatistics(databaseName, tableName, columns), rowCount);
+                       // }
+
+                        return Collections.emptyMap();
                     }));
         }
         catch (NoSuchObjectException e) {
@@ -491,9 +494,11 @@ public class ThriftHiveMetastore
                     .stopOn(NoSuchObjectException.class, HiveViewNotSupportedException.class)
                     .stopOnIllegalExceptions()
                     .run("getPartitionColumnStatistics", stats.getGetPartitionColumnStatistics().wrap(() -> {
-                        try (ThriftMetastoreClient client = createMetastoreClient(identity)) {
-                            return client.getPartitionColumnStatistics(databaseName, tableName, ImmutableList.copyOf(partitionNames), columnNames);
-                        }
+                        // metacat does not implement getPartitionColumnStatistics and we do not have the column level stats
+                        //try (HiveMetastoreClient client = clientProvider.createMetastoreClient()) {
+                        //    return client.getPartitionColumnStatistics(databaseName, tableName, ImmutableList.copyOf(partitionNames), columnNames);
+
+                        return Collections.emptyMap();
                     }));
         }
         catch (NoSuchObjectException e) {
