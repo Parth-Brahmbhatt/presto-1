@@ -139,6 +139,7 @@ public final class SystemSessionProperties
     private static final String GENIE_ENVIRONMENT = "genie_environment";
     private static final String GENIE_STACK = "genie_stack";
     private static final String GENIE_VERSION = "genie_version";
+    private static final String QUERY_METADATA = "query_metadata";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -613,6 +614,11 @@ public final class SystemSessionProperties
                         GENIE_VERSION,
                         "Genie version",
                         "",
+                        true),
+                stringProperty(
+                        QUERY_METADATA,
+                        "A json string representation of query metadata",
+                        "{}",
                         true));
     }
 
