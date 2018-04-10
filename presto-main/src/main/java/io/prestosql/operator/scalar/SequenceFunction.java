@@ -94,7 +94,7 @@ public final class SequenceFunction
     {
         checkValidStep(start, stop, step);
 
-        int length = toIntExact(diffDate(session, MONTH, start, stop) / step + 1);
+        int length = toIntExact(diffDate(MONTH, start, stop) / step + 1);
         checkMaxEntry(length);
 
         BlockBuilder blockBuilder = DATE.createBlockBuilder(null, length);

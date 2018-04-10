@@ -1664,6 +1664,7 @@
                                     <exclude>com.google.guava:guava</exclude>
                                     <exclude>com.fasterxml.jackson.core:jackson-core</exclude>
                                     <exclude>com.google.j2objc:j2objc-annotations</exclude>
+                                    <exclude>org.scala-lang:scala-library</exclude>
                                 </excludes>
                             </requireUpperBoundDeps>
                         </rules>

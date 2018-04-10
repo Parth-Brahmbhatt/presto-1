@@ -60,6 +60,15 @@ import io.prestosql.operator.aggregation.MergeHyperLogLogAggregation;
 import io.prestosql.operator.aggregation.MergeQuantileDigestFunction;
 import io.prestosql.operator.aggregation.MergeTDigestAggregation;
 import io.prestosql.operator.aggregation.MinNAggregationFunction;
+import io.prestosql.operator.aggregation.NetflixBuildSketchBytesAggregations;
+import io.prestosql.operator.aggregation.NetflixBuildSketchStringAggregations;
+import io.prestosql.operator.aggregation.NetflixCombineSketchBytesAggregations;
+import io.prestosql.operator.aggregation.NetflixCombineSketchStringAggregations;
+import io.prestosql.operator.aggregation.NetflixQueryApproxPercentileAggregations;
+import io.prestosql.operator.aggregation.NetflixQueryApproxPercentileSketchBytesAggregations;
+import io.prestosql.operator.aggregation.NetflixQueryApproxPercentileSketchStringAggregations;
+import io.prestosql.operator.aggregation.NetflixQueryCDFAggregations;
+import io.prestosql.operator.aggregation.NetflixQueryHistogramAsJSONFromSketchStringAggregations;
 import io.prestosql.operator.aggregation.RealCorrelationAggregation;
 import io.prestosql.operator.aggregation.RealCovarianceAggregation;
 import io.prestosql.operator.aggregation.RealGeometricMeanAggregations;
@@ -453,6 +462,15 @@ public class FunctionRegistry
                 .aggregates(RealCorrelationAggregation.class)
                 .aggregates(BitwiseOrAggregation.class)
                 .aggregates(BitwiseAndAggregation.class)
+                .aggregates(NetflixQueryApproxPercentileAggregations.class)
+                .aggregates(NetflixBuildSketchBytesAggregations.class)
+                .aggregates(NetflixBuildSketchStringAggregations.class)
+                .aggregates(NetflixCombineSketchBytesAggregations.class)
+                .aggregates(NetflixCombineSketchStringAggregations.class)
+                .aggregates(NetflixQueryApproxPercentileSketchBytesAggregations.class)
+                .aggregates(NetflixQueryApproxPercentileSketchStringAggregations.class)
+                .aggregates(NetflixQueryCDFAggregations.class)
+                .aggregates(NetflixQueryHistogramAsJSONFromSketchStringAggregations.class)
                 .scalar(RepeatFunction.class)
                 .scalars(SequenceFunction.class)
                 .scalars(SessionFunctions.class)

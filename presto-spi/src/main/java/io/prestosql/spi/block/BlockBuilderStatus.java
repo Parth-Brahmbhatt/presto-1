@@ -29,7 +29,7 @@ public class BlockBuilderStatus
 
     private int currentSize;
 
-    BlockBuilderStatus(PageBuilderStatus pageBuilderStatus)
+    public BlockBuilderStatus(PageBuilderStatus pageBuilderStatus)
     {
         this.pageBuilderStatus = requireNonNull(pageBuilderStatus, "pageBuilderStatus must not be null");
     }

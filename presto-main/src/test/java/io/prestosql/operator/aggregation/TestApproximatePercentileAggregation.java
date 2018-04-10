@@ -16,6 +16,8 @@ package io.prestosql.operator.aggregation;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.BlockBuilderStatus;
+import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.sql.tree.QualifiedName;
@@ -525,5 +527,12 @@ public class TestApproximatePercentileAggregation
         rleBlockBuilder.closeEntry();
 
         return new RunLengthEncodedBlock(rleBlockBuilder.build(), positionCount);
+    }
+
+    static RunLengthEncodedBlock createRLEBlock(long value, int positionCount)
+    {
+        BlockBuilder blockBuilder = BIGINT.createBlockBuilder(new BlockBuilderStatus(new PageBuilderStatus()), 1);
+        BIGINT.writeLong(blockBuilder, value);
+        return new RunLengthEncodedBlock(blockBuilder.build(), positionCount);
     }
 }

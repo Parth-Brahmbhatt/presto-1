@@ -199,7 +199,7 @@ public final class DateTimeFunctions
     // Standard format is YYYY-MM-DD, which gives up to 10 characters.
     // However extended notation with format ±(Y)+-MM-DD is also acceptable and as the maximum year
     // represented by 64bits timestamp is ~584944387 it may require up to 16 characters to represent a date.
-    public static Slice toISO8601FromDate(ConnectorSession session, @SqlType(StandardTypes.DATE) long date)
+    public static Slice toISO8601FromDate(@SqlType(StandardTypes.DATE) long date)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.date()
                 .withChronology(UTC_CHRONOLOGY);
@@ -249,7 +249,7 @@ public final class DateTimeFunctions
     @ScalarFunction("from_iso8601_date")
     @LiteralParameters("x")
     @SqlType(StandardTypes.DATE)
-    public static long fromISO8601Date(ConnectorSession session, @SqlType("varchar(x)") Slice iso8601DateTime)
+    public static long fromISO8601Date(@SqlType("varchar(x)") Slice iso8601DateTime)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.dateElementParser()
                 .withChronology(UTC_CHRONOLOGY);
@@ -261,7 +261,7 @@ public final class DateTimeFunctions
     @ScalarFunction("date_trunc")
     @LiteralParameters("x")
     @SqlType(StandardTypes.DATE)
-    public static long truncateDate(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.DATE) long date)
+    public static long truncateDate(@SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.DATE) long date)
     {
         long millis = getDateField(UTC_CHRONOLOGY, unit).roundFloor(DAYS.toMillis(date));
         return MILLISECONDS.toDays(millis);
@@ -271,7 +271,7 @@ public final class DateTimeFunctions
     @LiteralParameters("x")
     @ScalarFunction("date_add")
     @SqlType(StandardTypes.DATE)
-    public static long addFieldValueDate(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.DATE) long date)
+    public static long addFieldValueDate(@SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.DATE) long date)
     {
         long millis = getDateField(UTC_CHRONOLOGY, unit).add(DAYS.toMillis(date), toIntExact(value));
         return MILLISECONDS.toDays(millis);
@@ -281,7 +281,7 @@ public final class DateTimeFunctions
     @ScalarFunction("date_diff")
     @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
-    public static long diffDate(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.DATE) long date1, @SqlType(StandardTypes.DATE) long date2)
+    public static long diffDate(@SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.DATE) long date1, @SqlType(StandardTypes.DATE) long date2)
     {
         return getDateField(UTC_CHRONOLOGY, unit).getDifferenceAsLong(DAYS.toMillis(date2), DAYS.toMillis(date1));
     }
