@@ -392,4 +392,21 @@ public final class NetflixFunctions
     {
         return varcharExtractJson(json, jsonPath);
     }
+
+    @ScalarFunction("nf_json_extract")
+    @SqlNullable
+    @SqlType(JSON)
+    public static Slice nfVarcharExtractJson(@SqlType(VARCHAR) Slice json, @SqlType(VARCHAR) Slice jsonPath)
+            throws IOException
+    {
+        return varcharExtractJson(json, jsonPath);
+    }
+
+    @ScalarFunction("nf_json_extract")
+    @SqlNullable
+    @SqlType(JSON)
+    public static Slice nfExtractJson(@SqlType(JSON) Slice json, @SqlType(VARCHAR) Slice jsonPath) throws IOException
+    {
+        return extractJson(json, jsonPath);
+    }
 }
