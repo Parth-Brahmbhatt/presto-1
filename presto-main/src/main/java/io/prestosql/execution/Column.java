@@ -18,7 +18,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Objects;
 
-import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public final class Column
@@ -72,9 +71,6 @@ public final class Column
     @Override
     public String toString()
     {
-        return toStringHelper(this)
-                .addValue(name)
-                .addValue(type)
-                .toString();
+        return "name:" + this.getName() + ",type:" + this.getType();
     }
 }

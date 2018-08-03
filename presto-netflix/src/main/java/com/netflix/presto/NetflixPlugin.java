@@ -13,19 +13,28 @@
  */
 package com.netflix.presto;
 
-import io.prestosql.spi.Plugin;
 import com.google.common.collect.ImmutableSet;
+import io.prestosql.spi.Plugin;
+import io.prestosql.spi.eventlistener.EventListenerFactory;
 
 import java.util.Set;
 
 public class NetflixPlugin
             implements Plugin
 {
+    private EventListenerFactory eventListenerFactory;
+
     @Override
     public Set<Class<?>> getFunctions()
     {
         return ImmutableSet.<Class<?>>builder()
                 .add(NetflixFunctions.class)
                 .build();
+    }
+
+    @Override
+    public Iterable<EventListenerFactory> getEventListenerFactories()
+    {
+        return ImmutableSet.of(new NetflixEventListenerFactory());
     }
 }
