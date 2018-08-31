@@ -13,16 +13,28 @@
  */
 package com.netflix.presto;
 
+import io.prestosql.operator.scalar.AbstractTestFunctions;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static com.netflix.presto.NetflixFunctions.addHoursToDateint;
 import static com.netflix.presto.NetflixFunctions.dateDiff;
 import static com.netflix.presto.NetflixFunctions.dateSub;
 import static io.airlift.slice.Slices.utf8Slice;
+import static io.airlift.slice.Slices.wrappedBuffer;
 import static org.testng.Assert.assertEquals;
 
 public class TestNetflixFunctions
+        extends AbstractTestFunctions
 {
+    @BeforeClass
+    public void setUp()
+    {
+        functionAssertions.addFunctions(extractFunctions(new NetflixPlugin().getFunctions()));
+    }
+
     @Test
     public void testDateSub()
     {
@@ -43,5 +55,50 @@ public class TestNetflixFunctions
     public void testDateHourAdd()
     {
         assertEquals(addHoursToDateint(2011071818, 4), 2011071822);
+    }
+
+    @Test
+    public void testJsonExtractMultiple()
+    {
+        assertFunction("JSON_EXTRACT_MULTIPLE('{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}', '[\"x\", \"z\"]')", VARCHAR, "{\"x\":\"x_val\",\"z\":\"z_val\"}");
+        assertFunction("JSON_EXTRACT_MULTIPLE('{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}', '[\"x\", \"y\"]')", VARCHAR, "{\"x\":\"x_val\",\"y\":\"y_val\"}");
+        assertFunction("JSON_EXTRACT_MULTIPLE('{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}', '[\"y\"]')", VARCHAR, "{\"y\":\"y_val\"}");
+        assertFunction("JSON_EXTRACT_MULTIPLE('{\"a\":1, \"b\": {\"a\" : 2}}', '[\"a\"]')", VARCHAR, "{\"a\":1}");
+        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}".getBytes()), wrappedBuffer("[\"DOESNTEXIST\"]".getBytes())), null);
+        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("\"\"".getBytes()), wrappedBuffer("[\"a\"]".getBytes())), null);
+    }
+
+    @Test(expectedExceptions = NullPointerException.class)
+    public void testInvalidJsonExtractMultipleKeys()
+    {
+        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("".getBytes()), null), null);
+    }
+
+    @Test
+    public void testJsonArrayStringHelper()
+    {
+        String[] res = NetflixFunctions.ArrayStringHelper.toStringArray("[\"a\", \"b\", \"c\"]");
+        assertEquals(res.length, 3);
+        assertEquals(res[0], "a");
+        assertEquals(res[1], "b");
+        assertEquals(res[2], "c");
+
+        res = NetflixFunctions.ArrayStringHelper.toStringArray("[\"a\", \"b.c\", \"d\"]");
+        assertEquals(res.length, 3);
+        assertEquals(res[0], "a");
+        assertEquals(res[1], "b.c");
+        assertEquals(res[2], "d");
+
+        res = NetflixFunctions.ArrayStringHelper.toStringArray("[\"a\", \"b,c\", \"d\"]");
+        assertEquals(res.length, 3);
+        assertEquals(res[0], "a");
+        assertEquals(res[1], "b,c");
+        assertEquals(res[2], "d");
+
+        res = NetflixFunctions.ArrayStringHelper.toStringArray("[\"a\", \"b,c,d,e\", \"f;g;h\"]");
+        assertEquals(res.length, 3);
+        assertEquals(res[0], "a");
+        assertEquals(res[1], "b,c,d,e");
+        assertEquals(res[2], "f;g;h");
     }
 }

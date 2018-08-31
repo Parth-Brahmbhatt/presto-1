@@ -17,15 +17,29 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.function.Description;
 import io.prestosql.spi.function.ScalarFunction;
+import io.prestosql.spi.function.SqlNullable;
 import io.prestosql.spi.function.SqlType;
-import io.airlift.slice.Slice;
+import io.prestosql.spi.type.StandardTypes;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.type.StandardTypes.BIGINT;
@@ -35,6 +49,7 @@ import static java.util.Calendar.DAY_OF_MONTH;
 import static java.util.Calendar.HOUR_OF_DAY;
 import static java.util.Calendar.MONTH;
 import static java.util.Calendar.YEAR;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The implementations of these functions are copied from https://stash.corp.netflix.com/projects/BDP/repos/hive-udf/
@@ -237,5 +252,72 @@ public final class NetflixFunctions
         Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         calendar.setTimeInMillis(sessionStartTimeMillis);
         return calendar.get(HOUR_OF_DAY);
+    }
+
+    /**
+     * Until Presto supports table generating functions, this is a workaround to support extracting multiple fields from a json string (similar to Hive's json_tuple)
+     * Presto also doesn't support variable length arguments so keys to extract is a string representation of an array, e.g., ["key_1", "key_2"]
+     */
+    @ScalarFunction
+    @SqlNullable
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice jsonExtractMultiple(@SqlType(StandardTypes.VARCHAR) Slice json, @SqlType(StandardTypes.VARCHAR) Slice keys)
+    {
+        requireNonNull(keys);
+        if (json == null) {
+            return null;
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode newNode = mapper.createObjectNode();
+        try {
+            JsonNode rootNode = mapper.readTree(json.getInput());
+            String[] keys2Extract = ArrayStringHelper.toStringArray(keys.toStringUtf8());
+            for (String key : keys2Extract) {
+                JsonNode node = rootNode.get(key);
+                if (node != null) {
+                    newNode.set(key, node);
+                }
+            }
+        }
+        catch (IOException e) {
+            return null;
+        }
+
+        if (newNode.size() == 0) {
+            return null;
+        }
+        else {
+            return Slices.wrappedBuffer(newNode.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    @VisibleForTesting
+    public static class ArrayStringHelper
+    {
+        /**
+         * Input string has brackets and double quotes around individual array elements ["a", "b", "c.d"]
+         *
+         * @param arrayAsString string representation of an array of strings
+         * @return a string array created from the given arrayAsString
+         */
+        public static String[] toStringArray(String arrayAsString)
+        {
+            int len = arrayAsString.length();
+            if (arrayAsString.charAt(0) != '[' || arrayAsString.charAt(len - 1) != ']') {
+                throw new IllegalArgumentException("Input string should have opening and closing brackets, e.g., [\"a\", \"b\", \"c.d\"]");
+            }
+
+            arrayAsString = arrayAsString.substring(1, len - 1);
+
+            List<String> matches = new ArrayList<>();
+            Pattern regex = Pattern.compile("\\s\"']+|\"[^\"]*\"");
+            Matcher regexMatcher = regex.matcher(arrayAsString);
+            while (regexMatcher.find()) {
+                String stripped = regexMatcher.group().replaceAll("^\"|\"$", "");
+                matches.add(stripped);
+            }
+            return matches.toArray(new String[matches.size()]);
+        }
     }
 }
