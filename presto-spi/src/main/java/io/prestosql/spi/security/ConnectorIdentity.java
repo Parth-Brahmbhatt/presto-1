@@ -30,17 +30,18 @@ public class ConnectorIdentity
     private final Optional<Principal> principal;
     private final Optional<SelectedRole> role;
     private final Map<String, String> extraCredentials;
+    private final Map<String, String> sessionProperties;
 
     @Deprecated
     public ConnectorIdentity(String user, Optional<Principal> principal, Optional<SelectedRole> role)
     {
-        this(user, principal, role, emptyMap());
+        this(user, principal, role, emptyMap(), emptyMap());
     }
 
     @Deprecated
-    public ConnectorIdentity(String user, Optional<Principal> principal, Optional<SelectedRole> role, Map<String, String> extraCredentials)
+    public ConnectorIdentity(String user, Optional<Principal> principal, Optional<SelectedRole> role, Map<String, String> extraCredentials, Map<String, String> sessionProperties)
     {
-        this(user, emptySet(), principal, role, extraCredentials);
+        this(user, emptySet(), principal, role, extraCredentials, sessionProperties);
     }
 
     private ConnectorIdentity(
@@ -48,13 +49,15 @@ public class ConnectorIdentity
             Set<String> groups,
             Optional<Principal> principal,
             Optional<SelectedRole> role,
-            Map<String, String> extraCredentials)
+            Map<String, String> extraCredentials,
+            Map<String, String> sessionProperties)
     {
         this.user = requireNonNull(user, "user is null");
         this.groups = Set.copyOf(requireNonNull(groups, "groups is null"));
         this.principal = requireNonNull(principal, "principal is null");
         this.role = requireNonNull(role, "role is null");
         this.extraCredentials = Map.copyOf(requireNonNull(extraCredentials, "extraCredentials is null"));
+        this.sessionProperties = sessionProperties;
     }
 
     public String getUser()
@@ -80,6 +83,11 @@ public class ConnectorIdentity
     public Map<String, String> getExtraCredentials()
     {
         return extraCredentials;
+    }
+
+    public Map<String, String> getSessionProperties()
+    {
+        return sessionProperties;
     }
 
     @Override
@@ -112,6 +120,7 @@ public class ConnectorIdentity
         private Optional<Principal> principal = Optional.empty();
         private Optional<SelectedRole> role = Optional.empty();
         private Map<String, String> extraCredentials = new HashMap<>();
+        private Map<String, String> sessionProperties = new HashMap<>();
 
         private Builder(String user)
         {
@@ -152,9 +161,15 @@ public class ConnectorIdentity
             return this;
         }
 
+        public Builder withSessionProperties(Map<String, String> sessionProperties)
+        {
+            this.sessionProperties = new HashMap<>(requireNonNull(sessionProperties, "sessionProperties is null"));
+            return this;
+        }
+
         public ConnectorIdentity build()
         {
-            return new ConnectorIdentity(user, groups, principal, role, extraCredentials);
+            return new ConnectorIdentity(user, groups, principal, role, extraCredentials, sessionProperties);
         }
     }
 }

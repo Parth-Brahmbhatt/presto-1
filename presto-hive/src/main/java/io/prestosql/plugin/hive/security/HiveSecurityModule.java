@@ -18,6 +18,7 @@ import com.google.inject.Module;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.prestosql.plugin.base.security.FileBasedAccessControlModule;
 import io.prestosql.plugin.base.security.ReadOnlySecurityModule;
+import io.prestosql.plugin.hive.netflix.NetflixSecurityModule;
 
 import static io.airlift.configuration.ConditionalModule.installModuleIf;
 import static io.airlift.configuration.ConfigurationModule.installModules;
@@ -53,6 +54,11 @@ public class HiveSecurityModule
                         new StaticAccessControlMetadataModule()));
         bindSecurityModule("sql-standard", new SqlStandardSecurityModule());
         bindSecurityModule("allow-all", new AllowAllSecurityModule());
+        bindSecurityModule(
+            "netflix",
+            installModules(
+                new NetflixSecurityModule(),
+                new StaticAccessControlMetadataModule()));
     }
 
     private void bindSecurityModule(String name, Module module)

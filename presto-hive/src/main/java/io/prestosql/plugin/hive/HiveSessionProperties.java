@@ -96,6 +96,7 @@ public final class HiveSessionProperties
     private static final String DYNAMIC_FILTERING_PROBE_BLOCKING_TIMEOUT = "dynamic_filtering_probe_blocking_timeout";
     private static final String OPTIMIZE_SYMLINK_LISTING = "optimize_symlink_listing";
     private static final String LEGACY_HIVE_VIEW_TRANSLATION = "legacy_hive_view_translation";
+    public static final String AWS_IAM_ROLE = "aws_iam_role";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -402,6 +403,11 @@ public final class HiveSessionProperties
                         LEGACY_HIVE_VIEW_TRANSLATION,
                         "Use legacy Hive view translation mechanism",
                         hiveConfig.isLegacyHiveViewTranslation(),
+                        false),
+                stringProperty(
+                        AWS_IAM_ROLE,
+                        "AWS IAM Role for S3",
+                        "",
                         false));
     }
 

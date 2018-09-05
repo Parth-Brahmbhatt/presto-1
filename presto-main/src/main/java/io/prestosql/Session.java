@@ -356,6 +356,7 @@ public final class Session
                 clientTransactionSupport,
                 Identity.from(identity)
                         .withRoles(roles.build())
+                        .withSessionPropertiesByCatalog(identity.getSessionPropertiesByCatalog())
                         .build(),
                 source,
                 catalog,
@@ -431,7 +432,8 @@ public final class Session
 
     public ConnectorSession toConnectorSession()
     {
-        return new FullConnectorSession(this, identity.toConnectorIdentity());
+        return new FullConnectorSession(this,
+                catalog.isPresent() ? identity.toConnectorIdentity(catalog.get()) : identity.toConnectorIdentity());
     }
 
     public ConnectorSession toConnectorSession(String catalogName)

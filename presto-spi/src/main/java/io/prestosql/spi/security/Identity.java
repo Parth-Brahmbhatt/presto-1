@@ -35,6 +35,7 @@ public class Identity
     private final Map<String, SelectedRole> roles;
     private final Map<String, String> extraCredentials;
     private final Optional<Runnable> onDestroy;
+    private Map<String, Map<String, String>> sessionPropertiesByCatalog = new HashMap<>();
 
     private Identity(
             String user,
@@ -42,7 +43,8 @@ public class Identity
             Optional<Principal> principal,
             Map<String, SelectedRole> roles,
             Map<String, String> extraCredentials,
-            Optional<Runnable> onDestroy)
+            Optional<Runnable> onDestroy,
+            Map<String, Map<String, String>> sessionPropertiesByCatalog)
     {
         this.user = requireNonNull(user, "user is null");
         this.groups = Set.copyOf(requireNonNull(groups, "groups is null"));
@@ -50,6 +52,7 @@ public class Identity
         this.roles = Map.copyOf(requireNonNull(roles, "roles is null"));
         this.extraCredentials = Map.copyOf(requireNonNull(extraCredentials, "extraCredentials is null"));
         this.onDestroy = requireNonNull(onDestroy, "onDestroy is null");
+        this.sessionPropertiesByCatalog = sessionPropertiesByCatalog;
     }
 
     public String getUser()
@@ -83,6 +86,7 @@ public class Identity
                 .withGroups(groups)
                 .withPrincipal(principal)
                 .withExtraCredentials(extraCredentials)
+                .withSessionProperties(new HashMap<>())
                 .build();
     }
 
@@ -93,7 +97,18 @@ public class Identity
                 .withPrincipal(principal)
                 .withRole(Optional.ofNullable(roles.get(catalog)))
                 .withExtraCredentials(extraCredentials)
+                .withSessionProperties(sessionPropertiesByCatalog.get(catalog))
                 .build();
+    }
+
+    public void setSessionPropertiesByCatalog(Map<String, Map<String, String>> sessionPropertiesByCatalog)
+    {
+        this.sessionPropertiesByCatalog = sessionPropertiesByCatalog;
+    }
+
+    public Map<String, Map<String, String>> getSessionPropertiesByCatalog()
+    {
+        return sessionPropertiesByCatalog;
     }
 
     public void destroy()
@@ -167,6 +182,7 @@ public class Identity
         private Map<String, SelectedRole> roles = new HashMap<>();
         private Map<String, String> extraCredentials = new HashMap<>();
         private Optional<Runnable> onDestroy = Optional.empty();
+        private Map<String, Map<String, String>> sessionPropertiesByCatalog = new HashMap<>();
 
         public Builder(String user)
         {
@@ -245,9 +261,16 @@ public class Identity
             return this;
         }
 
+        public Builder withSessionPropertiesByCatalog(Map<String, Map<String, String>> sessionPropertiesByCatalog)
+        {
+            requireNonNull(sessionPropertiesByCatalog, "sessionPropertiesByCatalog is null");
+            this.sessionPropertiesByCatalog = sessionPropertiesByCatalog;
+            return this;
+        }
+
         public Identity build()
         {
-            return new Identity(user, groups, principal, roles, extraCredentials, onDestroy);
+            return new Identity(user, groups, principal, roles, extraCredentials, onDestroy, sessionPropertiesByCatalog);
         }
     }
 

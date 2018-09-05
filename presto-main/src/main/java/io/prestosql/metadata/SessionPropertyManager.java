@@ -183,10 +183,9 @@ public final class SessionPropertyManager
     public <T> T decodeCatalogPropertyValue(CatalogName catalog, String catalogName, String propertyName, @Nullable String propertyValue, Class<T> type)
     {
         String fullPropertyName = catalogName + "." + propertyName;
-        PropertyMetadata<?> property = getConnectorSessionPropertyMetadata(catalog, propertyName)
+        PropertyMetadata<?> property = getConnectorSessionPropertyMetadata(catalog, transformPropertyName(propertyName))
                 .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + fullPropertyName));
-
-        return decodePropertyValue(fullPropertyName, propertyValue, type, property);
+        return decodePropertyValue(transformPropertyName(fullPropertyName), propertyValue, type, property);
     }
 
     public void validateSystemSessionProperty(String propertyName, String propertyValue)
@@ -200,10 +199,10 @@ public final class SessionPropertyManager
     public void validateCatalogSessionProperty(CatalogName catalog, String catalogName, String propertyName, String propertyValue)
     {
         String fullPropertyName = catalogName + "." + propertyName;
-        PropertyMetadata<?> propertyMetadata = getConnectorSessionPropertyMetadata(catalog, propertyName)
+        PropertyMetadata<?> propertyMetadata = getConnectorSessionPropertyMetadata(catalog, transformPropertyName(propertyName))
                 .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + fullPropertyName));
 
-        decodePropertyValue(fullPropertyName, propertyValue, propertyMetadata.getJavaType(), propertyMetadata);
+        decodePropertyValue(transformPropertyName(fullPropertyName), propertyValue, propertyMetadata.getJavaType(), propertyMetadata);
     }
 
     private static <T> T decodePropertyValue(String fullPropertyName, @Nullable String propertyValue, Class<T> type, PropertyMetadata<?> metadata)
@@ -344,6 +343,21 @@ public final class SessionPropertyManager
             return Double.class;
         }
         throw new PrestoException(INVALID_SESSION_PROPERTY, format("Session property map key type %s is not supported", type));
+    }
+
+    private String transformPropertyName(String name)
+    {
+        // HACKING netflix specific session property aws_iam_role_<schema>
+        // if we have catalog.aws_iam_role, we just get the property.
+        // if we get catalog.aws_iam_role_<schema>, we return catalog.aws_iam_role.
+        // if we get only the session property name without the catalog, we just return the aws_iam_role.
+        final String awsIamRole = "aws_iam_role";
+        if (name.contains(awsIamRole) && !name.endsWith(awsIamRole)) {
+            // This would fail if we ever have schema with '.'
+            return name.contains(".") ? name.substring(0, name.indexOf('.')) + "." + awsIamRole : awsIamRole;
+        }
+
+        return name;
     }
 
     public static class SessionPropertyValue
