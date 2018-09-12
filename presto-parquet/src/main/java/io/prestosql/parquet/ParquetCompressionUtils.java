@@ -26,6 +26,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
 
 import static com.google.common.base.Preconditions.checkArgument;

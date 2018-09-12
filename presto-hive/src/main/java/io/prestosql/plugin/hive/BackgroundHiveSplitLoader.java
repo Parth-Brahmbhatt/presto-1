@@ -23,6 +23,7 @@ import com.google.common.collect.Streams;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.Duration;
+import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveSplit.BucketConversion;
 import io.prestosql.plugin.hive.HiveSplit.BucketValidation;
@@ -161,6 +162,9 @@ public class BackgroundHiveSplitLoader
     private final ConcurrentLazyQueue<HivePartitionMetadata> partitions;
     private final Deque<Iterator<InternalHiveSplit>> fileIterators = new ConcurrentLinkedDeque<>();
     private final Optional<ValidWriteIdList> validWriteIds;
+    private PrestoHdfsCache prestoHdfsCache;
+    private boolean isHdfsDeployed;
+    private static final Logger log = Logger.get(BackgroundHiveSplitLoader.class);
 
     // Purpose of this lock:
     // * Write lock: when you need a consistent view across partitions, fileIterators, and hiveSplitSource.
@@ -201,7 +205,10 @@ public class BackgroundHiveSplitLoader
             boolean recursiveDirWalkerEnabled,
             boolean ignoreAbsentPartitions,
             boolean optimizeSymlinkListing,
-            Optional<ValidWriteIdList> validWriteIds)
+            Optional<ValidWriteIdList> validWriteIds),
+            Optional<ValidWriteIdList> validWriteIds,
+            PrestoHdfsCache prestoHdfsCache,
+            boolean isHdfsDeployed)
     {
         this.table = table;
         this.transaction = requireNonNull(transaction, "tranaction is null");
@@ -223,6 +230,8 @@ public class BackgroundHiveSplitLoader
         this.partitions = new ConcurrentLazyQueue<>(partitions);
         this.hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName());
         this.validWriteIds = requireNonNull(validWriteIds, "validWriteIds is null");
+        this.prestoHdfsCache = prestoHdfsCache;
+        this.isHdfsDeployed = isHdfsDeployed;
     }
 
     @Override
@@ -370,6 +379,10 @@ public class BackgroundHiveSplitLoader
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, false);
         FileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, path);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());
+
+        if (isHdfsDeployed) {
+            prestoHdfsCache.setS3fs(fs);
+        }
 
         // S3 Select pushdown works at the granularity of individual S3 objects,
         // therefore we must not split files when it is enabled.
@@ -544,7 +557,7 @@ public class BackgroundHiveSplitLoader
                 // list all files in the partition
                 List<LocatedFileStatus> files = new ArrayList<>();
                 try {
-                    Iterators.addAll(files, new HiveFileIterator(table, readPath, fs, directoryLister, namenodeStats, FAIL, ignoreAbsentPartitions));
+                    Iterators.addAll(files, new HiveFileIterator(table, readPath, fs, directoryLister, namenodeStats, FAIL, ignoreAbsentPartitions, isHdfsDeployed, prestoHdfsCache));
                 }
                 catch (HiveFileIterator.NestedDirectoryNotAllowedException e) {
                     // Fail here to be on the safe side. This seems to be the same as what Hive does
@@ -735,7 +748,7 @@ public class BackgroundHiveSplitLoader
 
     private Iterator<InternalHiveSplit> createInternalHiveSplitIterator(Path path, FileSystem fileSystem, InternalHiveSplitFactory splitFactory, boolean splittable, Optional<AcidInfo> acidInfo)
     {
-        return Streams.stream(new HiveFileIterator(table, path, fileSystem, directoryLister, namenodeStats, recursiveDirWalkerEnabled ? RECURSE : IGNORED, ignoreAbsentPartitions))
+        return Streams.stream(new HiveFileIterator(table, path, fileSystem, directoryLister, namenodeStats, recursiveDirWalkerEnabled ? RECURSE : IGNORED, ignoreAbsentPartitions, isHdfsDeployed, prestoHdfsCache))
                 .map(status -> splitFactory.createInternalHiveSplit(status, OptionalInt.empty(), splittable, acidInfo))
                 .filter(Optional::isPresent)
                 .map(Optional::get)

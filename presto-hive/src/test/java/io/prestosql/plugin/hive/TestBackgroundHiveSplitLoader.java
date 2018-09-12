@@ -543,7 +543,9 @@ public class TestBackgroundHiveSplitLoader
                 false,
                 false,
                 true,
-                Optional.empty());
+                Optional.empty(),
+                new PrestoHdfsCache(),
+                false);
 
         HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
         backgroundHiveSplitLoader.start(hiveSplitSource);
@@ -967,7 +969,9 @@ public class TestBackgroundHiveSplitLoader
                 false,
                 false,
                 true,
-                validWriteIds);
+                validWriteIds,
+                new PrestoHdfsCache(),
+                false);
     }
 
     private BackgroundHiveSplitLoader backgroundHiveSplitLoader(List<LocatedFileStatus> files, DirectoryLister directoryLister)
@@ -999,7 +1003,9 @@ public class TestBackgroundHiveSplitLoader
                 false,
                 false,
                 true,
-                Optional.empty());
+                Optional.empty(),
+                new PrestoHdfsCache(),
+                false);
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoaderOfflinePartitions()
@@ -1025,7 +1031,9 @@ public class TestBackgroundHiveSplitLoader
                 false,
                 false,
                 true,
-                Optional.empty());
+                Optional.empty(),
+                new PrestoHdfsCache(),
+                false);
     }
 
     private static Iterable<HivePartitionMetadata> createPartitionMetadataWithOfflinePartitions()

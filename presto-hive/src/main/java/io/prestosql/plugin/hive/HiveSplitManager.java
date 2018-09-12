@@ -105,6 +105,8 @@ public class HiveSplitManager
     private final boolean recursiveDfsWalkerEnabled;
     private final CounterStat highMemorySplitSourceCounter;
     private final TypeManager typeManager;
+    private PrestoHdfsCache prestoHdfsCache;
+    private boolean isHdfsDeployed;
 
     @Inject
     public HiveSplitManager(
@@ -135,6 +137,12 @@ public class HiveSplitManager
                 hiveConfig.getMaxSplitsPerSecond(),
                 hiveConfig.getRecursiveDirWalkerEnabled(),
                 typeManager);
+                hiveConfig.getRecursiveDirWalkerEnabled();
+        this.prestoHdfsCache = new PrestoHdfsCache();
+        this.isHdfsDeployed = hiveConfig.isHdfsCacheEnabled();
+        if (isHdfsDeployed) {
+            prestoHdfsCache.setHdfsCache(hiveConfig.getHdfsCacheDefaultFs(), hiveConfig.getHdfsCacheReplicationFactor());
+        }
     }
 
     public HiveSplitManager(
@@ -239,7 +247,9 @@ public class HiveSplitManager
                 !hiveTable.getPartitionColumns().isEmpty() && isIgnoreAbsentPartitions(session),
                 isOptimizeSymlinkListing(session),
                 metastore.getValidWriteIds(session, hiveTable)
-                        .map(validTxnWriteIdList -> validTxnWriteIdList.getTableValidWriteIdList(table.getDatabaseName() + "." + table.getTableName())));
+                        .map(validTxnWriteIdList -> validTxnWriteIdList.getTableValidWriteIdList(table.getDatabaseName() + "." + table.getTableName())),
+                prestoHdfsCache,
+                isHdfsDeployed);
 
         HiveSplitSource splitSource;
         switch (splitSchedulingStrategy) {

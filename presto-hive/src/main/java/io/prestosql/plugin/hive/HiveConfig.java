@@ -147,6 +147,12 @@ public class HiveConfig
 
     private List<String> s3RoleMappings;
 
+    private boolean hdfsCacheEnabled;
+
+    private String hdfsCacheDefaultFs;
+
+    private int hdfsCacheReplication = 3;
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -1059,4 +1065,37 @@ public class HiveConfig
         this.s3RoleMappings = (s3RoleMappings == null) ? null : ImmutableList.copyOf(s3RoleMappings);
         return this;
     }
+
+    @Config("hive.hdfs-cache-enabled")
+    @ConfigDescription("Enable/disable hdfs cache")
+    public HiveConfig setHdfsCacheEnabled(boolean isHdfsCacheEnabled)
+    {
+        this.hdfsCacheEnabled = isHdfsCacheEnabled;
+        return this;
+    }
+
+    public boolean isHdfsCacheEnabled()
+    { return hdfsCacheEnabled; }
+
+    @Config("hive.hdfs-cache-default-fs")
+    @ConfigDescription("Set HDFS default fs for caching")
+    public HiveConfig setHdfsCacheDefaultFs(String hdfsDefaultFs)
+    {
+        this.hdfsCacheDefaultFs = hdfsDefaultFs;
+        return this;
+    }
+
+    public String getHdfsCacheDefaultFs()
+    { return hdfsCacheDefaultFs; }
+
+    @Config("hive.hdfs-cache-replication")
+    @ConfigDescription("Set replication factor for files cached in HDFS")
+    public HiveConfig setHdfsCacheReplicationFactor(int hdfsCacheReplication)
+    {
+        this.hdfsCacheReplication = hdfsCacheReplication;
+        return this;
+    }
+
+    public int getHdfsCacheReplicationFactor()
+    { return hdfsCacheReplication; }
 }

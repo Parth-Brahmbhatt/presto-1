@@ -580,7 +580,7 @@ public final class SystemSessionProperties
                         OMIT_DATETIME_TYPE_PRECISION,
                         "Omit precision when rendering datetime type names with default precision",
                         featuresConfig.isOmitDateTimeTypePrecision(),
-                        false));
+                        false),
                 new PropertyMetadata<>(
                         QUERY_MAX_DATA_SIZE,
                         "Maximum data size of a query",

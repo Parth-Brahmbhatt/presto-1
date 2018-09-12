@@ -102,7 +102,10 @@ public class TestHiveConfig
                 .setTimestampPrecision(HiveTimestampPrecision.DEFAULT_PRECISION)
                 .setOptimizeSymlinkListing(true)
                 .setLegacyHiveViewTranslation(false)
-                .setS3RoleMappings((String) null));
+                .setS3RoleMappings((String) null)
+                .setHdfsCacheEnabled(false)
+                .setHdfsCacheDefaultFs((String) null)
+                .setHdfsCacheReplicationFactor(3));
     }
 
     @Test
@@ -176,6 +179,9 @@ public class TestHiveConfig
                 .put("hive.optimize-symlink-listing", "false")
                 .put("hive.legacy-hive-view-translation", "true")
                 .put("hive.s3.role.mappings", "s3rolemappings")
+                .put("hive.hdfs-cache-default-fs", "hdfs://localhost:8020")
+                .put("hive.hdfs-cache-enabled", "true")
+                .put("hive.hdfs-cache-replication", "10")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -246,7 +252,10 @@ public class TestHiveConfig
                 .setOptimizeSymlinkListing(false)
                 .setLegacyHiveViewTranslation(true)
                 .setTimestampPrecision(HiveTimestampPrecision.NANOSECONDS)
-                .setS3RoleMappings("s3rolemappings");
+                .setS3RoleMappings("s3rolemappings")
+                .setHdfsCacheDefaultFs("hdfs://localhost:8020")
+                .setHdfsCacheEnabled(true)
+                .setHdfsCacheReplicationFactor(10);
 
         assertFullMapping(properties, expected);
     }
