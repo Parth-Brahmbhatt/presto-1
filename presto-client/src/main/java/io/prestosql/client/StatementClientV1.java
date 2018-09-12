@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -381,14 +382,7 @@ class StatementClientV1
                     MILLISECONDS.sleep(attempts * 100);
                 }
                 catch (InterruptedException e) {
-                    try {
-                        close();
-                    }
-                    finally {
-                        Thread.currentThread().interrupt();
-                    }
-                    state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
-                    throw new RuntimeException("StatementClient thread was interrupted");
+                    interruptQuery();
                 }
             }
             attempts++;
@@ -398,6 +392,9 @@ class StatementClientV1
                 response = JsonResponse.execute(QUERY_RESULTS_CODEC, httpClient, request);
             }
             catch (RuntimeException e) {
+                if (e.getCause() instanceof InterruptedIOException) {
+                    interruptQuery();
+                }
                 cause = e;
                 continue;
             }
@@ -412,6 +409,18 @@ class StatementClientV1
                 throw requestFailedException("fetching next", request, response);
             }
         }
+    }
+
+    private void interruptQuery()
+    {
+        try {
+            close();
+        }
+        finally {
+            Thread.currentThread().interrupt();
+        }
+        state.compareAndSet(State.RUNNING, State.CLIENT_ERROR);
+        throw new RuntimeException("StatementClient thread was interrupted");
     }
 
     private void processResponse(Headers headers, QueryResults results)
