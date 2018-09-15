@@ -451,5 +451,16 @@
                 </plugins>
             </build>
         </profile>
+        <profile>
+            <id>brotli-codec</id>
+            <dependencies>
+                <dependency>
+                    <groupId>netflix</groupId>
+                    <artifactId>brotli-codec</artifactId>
+                    <version>0.1.8</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 </project>
