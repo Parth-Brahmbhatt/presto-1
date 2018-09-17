@@ -33,6 +33,32 @@
         <tag>350</tag>
     </scm>
 
+    <repositories>
+        <repository>
+            <id>nfrepo-everything-pom</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/nfrepo-everything-pom</url>
+        </repository>
+        <repository>
+            <id>libs-releases-local</id>
+            <name>Netflix Artifactory</name>
+            <url>https://artifacts.netflix.com/libs-releases-local</url>
+        </repository>
+        <repository>
+            <id>libs-candidates-local-pom</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/libs-candidates-local-pom</url>
+        </repository>
+
+        <repository>
+            <id>libs-candidates-local</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/libs-candidates-local</url>
+        </repository>
+
+    </repositories>
+
+
     <properties>
         <air.main.basedir>${project.basedir}</air.main.basedir>
 
@@ -1699,6 +1725,26 @@
                             <version>1.3.2</version>
                         </dependency>
                     </dependencies>
+                </plugin>
+
+                <plugin>
+                    <groupId>com.ning.maven.plugins</groupId>
+                    <artifactId>maven-duplicate-finder-plugin</artifactId>
+                    <configuration>
+                        <useDefaultResourceIgnoreList>true</useDefaultResourceIgnoreList>
+                        <ignoredDependencies>
+                            <!--These two dependencies are pulled in by data-utils artifact. Unfortunately, it isn't easy to fix them
+                            in the data-utils library. So we have to resort to ignoring them for duplicate finder to pass. -->
+                            <ignoredDependency>
+                                <groupId>org.scala-lang</groupId>
+                                <artifactId>scala-compiler</artifactId>
+                            </ignoredDependency>
+                            <ignoredDependency>
+                                <groupId>com.github.pureconfig</groupId>
+                                <artifactId>pureconfig-macros_2.11</artifactId>
+                            </ignoredDependency>
+                        </ignoredDependencies>
+                    </configuration>
                 </plugin>
 
                 <plugin>

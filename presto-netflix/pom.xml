@@ -23,12 +23,10 @@
             <artifactId>presto-spi</artifactId>
             <scope>provided</scope>
         </dependency>
-
         <dependency>
             <groupId>io.prestosql</groupId>
             <artifactId>presto-main</artifactId>
         </dependency>
-
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
@@ -144,7 +142,6 @@
             <artifactId>presto-tests</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>io.prestosql</groupId>
             <artifactId>presto-main</artifactId>

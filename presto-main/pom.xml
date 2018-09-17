@@ -307,9 +307,21 @@
             <artifactId>aether-api</artifactId>
         </dependency>
 
+        <!-- used by tests but also needed transitively -->
         <dependency>
             <groupId>org.weakref</groupId>
             <artifactId>jmxutils</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.prestosql</groupId>
+            <artifactId>presto-plugin-toolkit</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.netflix.data</groupId>
+            <artifactId>data-utils</artifactId>
+            <version>0.1.87</version>
         </dependency>
 
         <!-- used by tests but also needed transitively -->

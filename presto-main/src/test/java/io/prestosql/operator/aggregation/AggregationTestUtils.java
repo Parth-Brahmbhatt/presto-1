@@ -20,11 +20,13 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
+import io.prestosql.spi.type.SqlVarbinary;
 import org.apache.commons.math3.util.Precision;
 
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.stream.IntStream;
 
@@ -111,6 +113,19 @@ public final class AggregationTestUtils
 
     private static void assertAggregationInternal(InternalAggregationFunction function, BiFunction<Object, Object, Boolean> isEqual, String testDescription, Object expectedValue, Page... pages)
     {
+        BiConsumer<Object, Object> equalAssertion = (actual, expected) -> {
+            assertEquals(actual, expected);
+        };
+        if (expectedValue instanceof Double && !expectedValue.equals(Double.NaN)) {
+            equalAssertion = (actual, expected) -> assertEquals((double) actual, (double) expected, 1e-10);
+        }
+        if (expectedValue instanceof Float && !expectedValue.equals(Float.NaN)) {
+            equalAssertion = (actual, expected) -> assertEquals((float) actual, (float) expected, 1e-10f);
+        }
+        if (expectedValue instanceof SqlVarbinary && !expectedValue.equals(null)) {
+            equalAssertion = (actual, expected) -> assertEquals((SqlVarbinary) actual, (SqlVarbinary) expected);
+        }
+
         // This assertAggregation does not try to split up the page to test the correctness of combine function.
         // Do not use this directly. Always use the other assertAggregation.
         assertFunctionEquals(isEqual, testDescription, aggregation(function, pages), expectedValue);
