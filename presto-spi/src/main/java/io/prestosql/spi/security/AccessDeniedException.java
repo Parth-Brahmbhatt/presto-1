@@ -280,12 +280,17 @@ public class AccessDeniedException
 
     public static void denySelectTable(String tableName)
     {
-        denySelectTable(tableName, null);
+        denySelectTable(tableName, null, "table");
     }
 
     public static void denySelectTable(String tableName, String extraInfo)
     {
-        throw new AccessDeniedException(format("Cannot select from table %s%s", tableName, formatExtraInfo(extraInfo)));
+        denySelectTable(tableName, extraInfo, "table");
+    }
+
+    public static void denySelectTable(String tableName, String extraInfo, String tableType)
+    {
+        throw new AccessDeniedException(format("Cannot select from %s %s%s", tableType, tableName, formatExtraInfo(extraInfo)));
     }
 
     public static void denyInsertTable(String tableName)

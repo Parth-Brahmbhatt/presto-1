@@ -21,11 +21,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import io.airlift.slice.Slice;
+import io.prestosql.FullConnectorSession;
 import io.prestosql.Session;
 import io.prestosql.connector.CatalogName;
 import io.prestosql.metadata.ResolvedFunction.ResolvedFunctionDecoder;
+import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.operator.window.WindowFunctionSupplier;
+import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.ArrayBlockEncoding;
@@ -101,9 +104,13 @@ import io.prestosql.spi.type.TypeId;
 import io.prestosql.spi.type.TypeNotFoundException;
 import io.prestosql.spi.type.TypeOperators;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.sql.analyzer.Analyzer;
 import io.prestosql.sql.analyzer.FeaturesConfig;
+import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.ConnectorExpressions;
+import io.prestosql.sql.parser.ParsingOptions;
+import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.transaction.TransactionManager;
@@ -139,6 +146,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.primitives.Primitives.wrap;
 import static io.prestosql.metadata.FunctionKind.AGGREGATE;
@@ -608,7 +616,12 @@ public final class MetadataManager
                 // if table and view names overlap, the view wins
                 for (Entry<QualifiedObjectName, ConnectorViewDefinition> entry : getViews(session, prefix).entrySet()) {
                     ImmutableList.Builder<ColumnMetadata> columns = ImmutableList.builder();
-                    for (ViewColumn column : entry.getValue().getColumns()) {
+                    ConnectorViewDefinition viewDefinition = entry.getValue();
+                    if(!viewDefinition.isPrestoView()) {
+                        viewDefinition = deserializeHiveView(session, viewDefinition);
+                    }
+
+                    for (ViewColumn column : viewDefinition.getColumns()) {
                         try {
                             columns.add(new ColumnMetadata(column.getName(), getType(column.getType())));
                         }
@@ -1046,7 +1059,8 @@ public final class MetadataManager
                             prefix.getCatalogName(),
                             entry.getKey().getSchemaName(),
                             entry.getKey().getTableName());
-                    views.put(viewName, entry.getValue());
+                    ConnectorViewDefinition viewDefinition = entry.getValue();
+                    views.put(viewName, viewDefinition.isPrestoView()? viewDefinition : deserializeHiveView(session, viewDefinition));
                 }
             }
         }
@@ -1096,7 +1110,11 @@ public final class MetadataManager
             ConnectorMetadata metadata = catalogMetadata.getMetadataFor(catalogName);
 
             ConnectorSession connectorSession = session.toConnectorSession(catalogName);
-            return metadata.getView(connectorSession, viewName.asSchemaTableName());
+            Optional<ConnectorViewDefinition> view = metadata.getView(connectorSession, viewName.asSchemaTableName());
+            if (view.isEmpty()) {
+                return view;
+            }
+            return view.get().isPrestoView()? view: Optional.of(deserializeHiveView(session, view.get()));
         }
         return Optional.empty();
     }
@@ -2126,6 +2144,28 @@ public final class MetadataManager
     //
     // Helpers
     //
+
+    private ConnectorViewDefinition deserializeHiveView(Session session, ConnectorViewDefinition view)
+    {
+        String sql = view.getViewExpandedText().orElseThrow(
+                () -> new PrestoException(INVALID_VIEW, "Expanded sql is required for Hive view"));
+        String originalSql = view.getOriginalSql();
+        try {
+            SqlParser sqlParser = new SqlParser();
+            Analyzer analyzer = new Analyzer(session, this, sqlParser, new AllowAllAccessControl(), Optional.<QueryExplainer>empty(),
+                new ArrayList(), new HashMap<>(), WarningCollector.NOOP);
+            io.prestosql.sql.tree.Statement statement = sqlParser.createStatement(sql, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));
+            io.prestosql.sql.analyzer.Analysis analysis = analyzer.analyze(statement);
+            List<ConnectorViewDefinition.ViewColumn> columns = analysis.getOutputDescriptor()
+                    .getVisibleFields().stream()
+                    .map(field -> new ConnectorViewDefinition.ViewColumn(field.getName().get(), field.getType().getTypeId()))
+                    .collect(toImmutableList());
+            return new ConnectorViewDefinition(originalSql, view.getViewExpandedText(), session.getCatalog(), view.getSchema(), columns, Optional.empty(), view.getOwner(), false, false);
+        }
+        catch (IllegalArgumentException e) {
+            throw new PrestoException(INVALID_VIEW, "Invalid view with SQL: " + sql, e);
+        }
+    }
 
     private Optional<CatalogMetadata> getOptionalCatalogMetadata(Session session, String catalogName)
     {

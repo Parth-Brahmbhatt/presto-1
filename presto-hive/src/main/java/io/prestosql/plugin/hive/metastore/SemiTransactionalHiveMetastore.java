@@ -52,6 +52,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -1505,7 +1506,7 @@ public class SemiTransactionalHiveMetastore
                 }
             }
             addTableOperations.add(new CreateTableOperation(tableAndMore.getIdentity(), table, tableAndMore.getPrincipalPrivileges(), tableAndMore.isIgnoreExisting()));
-            if (!isPrestoView(table)) {
+            if (!table.getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
                 updateStatisticsOperations.add(new UpdateStatisticsOperation(
                         tableAndMore.getIdentity(),
                         table.getSchemaTableName(),

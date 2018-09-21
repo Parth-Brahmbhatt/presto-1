@@ -101,6 +101,7 @@ public class TestConnectorViewDefinition
     {
         assertRoundTrip(new ConnectorViewDefinition(
                 "test view SQL",
+                Optional.empty(),
                 Optional.of("test_catalog"),
                 Optional.of("test_schema"),
                 ImmutableList.of(
@@ -108,6 +109,7 @@ public class TestConnectorViewDefinition
                         new ViewColumn("xyz", new ArrayType(createVarcharType(32)).getTypeId())),
                 Optional.of("comment"),
                 Optional.of("test_owner"),
+                false,
                 false));
     }
 

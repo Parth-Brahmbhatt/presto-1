@@ -724,9 +724,6 @@ public class HiveMetadata
             try {
                 columns.put(tableName, getTableMetadata(session, tableName).getColumns());
             }
-            catch (HiveViewNotSupportedException e) {
-                // view is not supported
-            }
             catch (TableNotFoundException e) {
                 // table disappeared during listing operation
             }
@@ -1943,8 +1940,54 @@ public class HiveMetadata
                                 Optional.of(view.getOwner()),
                                 false);
                     }
-                    return definition;
+                    if (translateHiveViews && isHiveOrPrestoView(view)) {
+                        return Optional.of(buildHiveViewConnectorDefinition(catalogName, view));
+                    }
+                    return Optional.of(new ConnectorViewDefinition(
+                        view.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
+                        view.getViewExpandedText(),
+                        Optional.of(viewName.getSchemaName()),
+                        Optional.of(view.getOwner().replaceAll("@.*", ""))));
                 });
+    }
+
+    @Override
+    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
+    {
+        ImmutableMap.Builder<SchemaTableName, ConnectorViewDefinition> views = ImmutableMap.builder();
+        List<SchemaTableName> tableNames;
+
+        tableNames = listViews(session, schemaName);
+        for (SchemaTableName schemaTableName : tableNames) {
+            Optional<Table> table = metastore.getTable(new HiveIdentity(session), schemaTableName.getSchemaName(), schemaTableName.getTableName());
+            if (table.isPresent() && table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
+                Table tbl = table.get();
+                ConnectorViewDefinition viewDefinition = "true".equals(tbl.getParameters().get(PRESTO_VIEW_FLAG)) ? decodeViewData(tbl.getViewOriginalText().get()) : null;
+                if (viewDefinition != null) {
+                    views.put(schemaTableName, new ConnectorViewDefinition(
+                        viewDefinition.getOriginalSql(),
+                        viewDefinition.getCatalog(),
+                        viewDefinition.getSchema(),
+                        viewDefinition.getColumns(), //need view columns
+                        viewDefinition.getComment(),
+                        viewDefinition.getOwner(),
+                        viewDefinition.isRunAsInvoker()));
+                } else {
+                    views.put(schemaTableName, new ConnectorViewDefinition(
+                        tbl.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
+                        tbl.getViewExpandedText(),
+                        Optional.of(tbl.getSchemaTableName().getSchemaName()),
+                        Optional.of(tbl.getOwner().replaceAll("@.*", ""))
+                    ));
+                }
+            }
+        }
+        return views.build();
+    }
+
+    private boolean isHiveOrPrestoView(Table table)
+    {
+        return table.getTableType().equals(TableType.VIRTUAL_VIEW.name());
     }
 
     private static boolean filterSchema(String schemaName)
