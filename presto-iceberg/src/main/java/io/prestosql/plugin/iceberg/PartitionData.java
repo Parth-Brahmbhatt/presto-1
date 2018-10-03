@@ -140,6 +140,7 @@ public class PartitionData
             case DOUBLE:
                 return partitionValue.doubleValue();
             case STRING:
+            case UUID:
                 return partitionValue.asText();
             case FIXED:
             case BINARY:

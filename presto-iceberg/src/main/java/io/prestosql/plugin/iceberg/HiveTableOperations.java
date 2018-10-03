@@ -77,6 +77,7 @@ public class HiveTableOperations
     public static final String METADATA_LOCATION = "metadata_location";
     public static final String PREVIOUS_METADATA_LOCATION = "previous_metadata_location";
     private static final String METADATA_FOLDER_NAME = "metadata";
+    private static final String ICEBERG_TABLE_TYPE = "ICEBERG";
 
     private static final StorageFormat STORAGE_FORMAT = StorageFormat.create(
             LazySimpleSerDe.class.getName(),
