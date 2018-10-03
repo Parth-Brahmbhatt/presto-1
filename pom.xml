@@ -135,6 +135,7 @@
         <module>presto-proxy</module>
         <module>presto-kudu</module>
         <module>presto-elasticsearch</module>
+        <module>presto-iceberg</module>
     </modules>
 
     <dependencyManagement>
@@ -222,6 +223,12 @@
             <dependency>
                 <groupId>io.prestosql</groupId>
                 <artifactId>presto-hive-hadoop2</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.prestosql</groupId>
+                <artifactId>presto-iceberg</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
