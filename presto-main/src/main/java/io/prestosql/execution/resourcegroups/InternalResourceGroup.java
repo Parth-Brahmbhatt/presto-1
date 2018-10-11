@@ -586,7 +586,7 @@ public class InternalResourceGroup
         }
     }
 
-    public void run(ManagedQueryExecution query)
+    public void run(ManagedQueryExecution query, boolean shouldQueueQueries)
     {
         synchronized (root) {
             if (!subGroups.isEmpty()) {
@@ -608,7 +608,7 @@ public class InternalResourceGroup
                 query.fail(new QueryQueueFullException(id));
                 return;
             }
-            if (canRun) {
+            if (canRun && !shouldQueueQueries) {
                 startInBackground(query);
             }
             else {

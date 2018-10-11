@@ -23,9 +23,22 @@ import io.prestosql.execution.QueryManager;
 import io.prestosql.testing.DistributedQueryRunner;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.ResultWithQueryId;
+import com.google.common.collect.ImmutableSet;
+import io.prestosql.Session;
+import io.prestosql.spi.QueryId;
+import io.prestosql.spi.session.ResourceEstimates;
 import io.prestosql.tests.tpch.TpchQueryRunnerBuilder;
 import org.testng.annotations.Test;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import static io.prestosql.execution.QueryState.QUEUED;
+import static io.prestosql.execution.QueryState.RUNNING;
+import static io.prestosql.execution.TestQueryRunnerUtil.createQuery;
+import static io.prestosql.execution.TestQueryRunnerUtil.waitForQueryState;
+import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.SystemSessionProperties.REQUIRED_WORKERS_COUNT;
 import static io.prestosql.SystemSessionProperties.REQUIRED_WORKERS_MAX_WAIT_TIME;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
@@ -237,6 +250,62 @@ public class TestMinWorkerRequirement
         }
         finally {
             service.shutdown();
+        }
+    }
+
+    @Test(timeOut = 50_000)
+    public void testInsufficientWorkerNodesWithQueuePolicy()
+            throws Exception
+    {
+        try (DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
+                .setSingleCoordinatorProperty("query-manager.initialization-required-workers", "5")
+                .setSingleExtraProperty("query-manager.queue-queries.insufficient-workers", "true")
+                .setNodeCount(4)
+                .build()) {
+            QueryId scheduled = createQuery(queryRunner, newSession("scheduled", ImmutableSet.of(), null), "SELECT 1");
+            waitForQueryState(queryRunner, scheduled, QUEUED);
+        }
+    }
+
+    private static Session newSession(String source, Set<String> clientTags, ResourceEstimates resourceEstimates)
+    {
+        return testSessionBuilder()
+                .setCatalog(null)
+                .setSchema(null)
+                .setSource(source)
+                .setClientTags(clientTags)
+                .setResourceEstimates(resourceEstimates)
+                .build();
+    }
+
+    @Test(timeOut = 50_000)
+    public void testInsufficientWorkerNodesWithCoordinatorExcludedWithQueuePolicy()
+            throws Exception
+    {
+        Map<String, String> extraProperties = new HashMap<>();
+        extraProperties.put("query-manager.initialization-required-workers", "4");
+        extraProperties.put("query-manager.queue-queries.insufficient-workers", "true");
+        extraProperties.put("node-scheduler.include-coordinator", "false");
+        try (DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
+                .setExtraProperties(extraProperties)
+                .setNodeCount(4)
+                .build()) {
+            QueryId scheduled = createQuery(queryRunner, newSession("scheduled", ImmutableSet.of(), null), "SELECT 1");
+            waitForQueryState(queryRunner, scheduled, QUEUED);
+        }
+    }
+
+    @Test
+    public void testSufficientWorkerNodesWithQueuePolicy()
+            throws Exception
+    {
+        try (DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
+                .setSingleCoordinatorProperty("query-manager.initialization-required-workers", "4")
+                .setSingleExtraProperty("query-manager.queue-queries.insufficient-workers", "true")
+                .setNodeCount(4)
+                .build()) {
+            QueryId scheduled = createQuery(queryRunner, newSession("scheduled", ImmutableSet.of(), null), "SELECT 1");
+            waitForQueryState(queryRunner, scheduled, RUNNING);
         }
     }
 }

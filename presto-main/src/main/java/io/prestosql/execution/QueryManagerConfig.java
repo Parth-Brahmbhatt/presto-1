@@ -69,6 +69,7 @@ public class QueryManagerConfig
 
     private int requiredWorkers = 1;
     private Duration requiredWorkersMaxWait = new Duration(5, TimeUnit.MINUTES);
+    private boolean queueQueriesWithInsufficientWorkers;
 
     @Min(1)
     public int getScheduleSplitBatchSize()
@@ -357,7 +358,20 @@ public class QueryManagerConfig
     @NotNull
     public Duration getRequiredWorkersMaxWait()
     {
-        return requiredWorkersMaxWait;
+        return this.requiredWorkersMaxWait;
+    }
+
+    public boolean getQueueQueriesWithInsufficientWorkers()
+    {
+        return queueQueriesWithInsufficientWorkers;
+    }
+
+    @Config("query-manager.queue-queries.insufficient-workers")
+    @ConfigDescription("Whether to queue or reject queries when the number of workers are less than query-manager.initialization-required-workers")
+    public QueryManagerConfig setQueueQueriesWithInsufficientWorkers(boolean queueQueriesWithInsufficientWorkers)
+    {
+        this.queueQueriesWithInsufficientWorkers = queueQueriesWithInsufficientWorkers;
+        return this;
     }
 
     @Config("query-manager.required-workers-max-wait")
@@ -367,6 +381,7 @@ public class QueryManagerConfig
         this.requiredWorkersMaxWait = requiredWorkersMaxWait;
         return this;
     }
+
     @NotNull
     public DataSize getQueryMaxDataSize()
     {

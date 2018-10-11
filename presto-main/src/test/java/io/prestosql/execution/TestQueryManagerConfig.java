@@ -56,6 +56,7 @@ public class TestQueryManagerConfig
                 .setQueryMaxScanPhysicalBytes(null)
                 .setRequiredWorkers(1)
                 .setRequiredWorkersMaxWait(new Duration(5, TimeUnit.MINUTES))
+                .setQueueQueriesWithInsufficientWorkers(false)
                 .setQueryMaxDataSize(new DataSize(100, TERABYTE)));
     }
 
@@ -86,6 +87,8 @@ public class TestQueryManagerConfig
                 .put("query-manager.required-workers", "333")
                 .put("query-manager.required-workers-max-wait", "33m")
                 .put("query.max-data-size", "10GB")
+                .put("query-manager.queue-queries.insufficient-workers", "true")
+                .put("query.max-data-size", "10GB")
                 .build();
 
         QueryManagerConfig expected = new QueryManagerConfig()
@@ -111,7 +114,8 @@ public class TestQueryManagerConfig
                 .setQueryMaxScanPhysicalBytes(DataSize.of(1, KILOBYTE))
                 .setRequiredWorkers(333)
                 .setRequiredWorkersMaxWait(new Duration(33, TimeUnit.MINUTES))
-                .setQueryMaxDataSize(new DataSize(10, GIGABYTE));
+                .setQueryMaxDataSize(new DataSize(10, GIGABYTE))
+                .setQueueQueriesWithInsufficientWorkers(true);
 
         assertFullMapping(properties, expected);
     }

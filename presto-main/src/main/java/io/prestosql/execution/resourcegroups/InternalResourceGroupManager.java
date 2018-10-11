@@ -17,7 +17,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
+import io.airlift.units.Duration;
 import io.prestosql.execution.ManagedQueryExecution;
+import io.prestosql.execution.QueryManagerConfig;
+import io.prestosql.execution.resourcegroups.InternalResourceGroup.RootInternalResourceGroup;
+import io.prestosql.execution.scheduler.NodeSchedulerConfig;
+import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
@@ -55,7 +60,11 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
+import static io.airlift.units.Duration.nanosSince;
+import static io.prestosql.metadata.NodeState.ACTIVE;
 import static io.prestosql.spi.StandardErrorCode.QUERY_REJECTED;
+import static io.prestosql.spi.StandardErrorCode.SERVER_STARTING_UP;
+import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -80,14 +89,29 @@ public final class InternalResourceGroupManager<C>
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicLong lastCpuQuotaGenerationNanos = new AtomicLong(System.nanoTime());
     private final Map<String, ResourceGroupConfigurationManagerFactory> configurationManagerFactories = new ConcurrentHashMap<>();
+    private final InternalNodeManager internalNodeManager;
+    private final boolean isIncludeCoordinator;
+    private final int initializationRequiredWorkers;
+    private final Duration initializationTimeout;
+    private final long initialNanos;
+    private final boolean shouldQueueQueriesWithInsufficientWorkers;
+    private final AtomicBoolean acceptQueries = new AtomicBoolean();
 
     @Inject
-    public InternalResourceGroupManager(LegacyResourceGroupConfigurationManager legacyManager, ClusterMemoryPoolManager memoryPoolManager, NodeInfo nodeInfo, MBeanExporter exporter)
+    public InternalResourceGroupManager(LegacyResourceGroupConfigurationManager legacyManager, ClusterMemoryPoolManager memoryPoolManager, NodeInfo nodeInfo, MBeanExporter exporter, InternalNodeManager internalNodeManager, QueryManagerConfig queryManagerConfig, NodeSchedulerConfig nodeSchedulerConfig)
     {
         this.exporter = requireNonNull(exporter, "exporter is null");
         this.configurationManagerContext = new ResourceGroupConfigurationManagerContextInstance(memoryPoolManager, nodeInfo.getEnvironment());
         this.legacyManager = requireNonNull(legacyManager, "legacyManager is null");
         this.configurationManager = new AtomicReference<>(cast(legacyManager));
+        this.internalNodeManager = requireNonNull(internalNodeManager, "internalNodeManager is null");
+        requireNonNull(nodeSchedulerConfig, "nodeSchedulerConfig is null");
+        requireNonNull(queryManagerConfig, "queryManagerConfig is null");
+        this.isIncludeCoordinator = nodeSchedulerConfig.isIncludeCoordinator();
+        this.initializationRequiredWorkers = queryManagerConfig.getRequiredWorkers();
+        this.initializationTimeout = queryManagerConfig.getRequiredWorkersMaxWait();
+        this.initialNanos = System.nanoTime();
+        this.shouldQueueQueriesWithInsufficientWorkers = queryManagerConfig.getQueueQueriesWithInsufficientWorkers();
     }
 
     @Override
@@ -106,12 +130,33 @@ public final class InternalResourceGroupManager<C>
                 .map(InternalResourceGroup::getPathToRoot);
     }
 
+    private boolean shouldQueueQueries()
+    {
+        return (getActiveWorkerCount() < initializationRequiredWorkers && shouldQueueQueriesWithInsufficientWorkers);
+    }
+
+    private int getActiveWorkerCount()
+    {
+        int activeWorkerCount = internalNodeManager.getNodes(ACTIVE).size();
+        if (!isIncludeCoordinator) {
+            activeWorkerCount--;
+        }
+        return activeWorkerCount;
+    }
+
     @Override
     public void submit(ManagedQueryExecution queryExecution, SelectionContext<C> selectionContext, Executor executor)
     {
         checkState(configurationManager.get() != null, "configurationManager not set");
+        int activeWorkerCount = getActiveWorkerCount();
+        if (!acceptQueries.get() && !shouldQueueQueriesWithInsufficientWorkers) {
+            if (nanosSince(initialNanos).compareTo(initializationTimeout) < 0 && activeWorkerCount < initializationRequiredWorkers) {
+                queryExecution.fail(new PrestoException(SERVER_STARTING_UP, String.format("Cluster is still initializing, there are insufficient active worker nodes (%s) to run query. Waiting for (%s) active worker nodes.", activeWorkerCount, initializationRequiredWorkers)));
+            }
+            acceptQueries.set(true);
+        }
         createGroupIfNecessary(selectionContext, executor);
-        groups.get(selectionContext.getResourceGroupId()).run(queryExecution);
+        groups.get(selectionContext.getResourceGroupId()).run(queryExecution, shouldQueueQueries());
     }
 
     @Override
@@ -198,20 +243,23 @@ public final class InternalResourceGroupManager<C>
             // nano time has overflowed
             lastCpuQuotaGenerationNanos.set(nanoTime);
         }
-        for (InternalResourceGroup group : rootGroups) {
-            try {
-                if (elapsedSeconds > 0) {
-                    group.generateCpuQuota(elapsedSeconds);
+
+        if (!shouldQueueQueries()) {
+            for (RootInternalResourceGroup group : rootGroups) {
+                try {
+                    if (elapsedSeconds > 0) {
+                        group.generateCpuQuota(elapsedSeconds);
+                    }
                 }
-            }
-            catch (RuntimeException e) {
-                log.error(e, "Exception while generation cpu quota for %s", group);
-            }
-            try {
-                group.updateGroupsAndProcessQueuedQueries();
-            }
-            catch (RuntimeException e) {
-                log.error(e, "Exception while processing queued queries for %s", group);
+                catch (RuntimeException e) {
+                    log.error(e, "Exception while generation cpu quota for %s", group);
+                }
+                try {
+                    group.processQueuedQueries();
+                }
+                catch (RuntimeException e) {
+                    log.error(e, "Exception while processing queued queries for %s", group);
+                }
             }
         }
     }
