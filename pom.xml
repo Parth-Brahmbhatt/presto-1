@@ -76,7 +76,7 @@
         <air.test.thread-count>2</air.test.thread-count>
         <!-- Be conservative about memory allotment, because tests start background process (e.g. docker containers) -->
         <air.test.jvmsize>3g</air.test.jvmsize>
-
+        <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
         <air.javadoc.lint>-missing</air.javadoc.lint>
     </properties>
 
