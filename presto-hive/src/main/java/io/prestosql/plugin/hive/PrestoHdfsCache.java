@@ -96,9 +96,7 @@ public class PrestoHdfsCache
             try {
                 Path hdfsPath = new Path(cacheBasePath, parentPathDigest + "/" + s3path.getName());
                 if (hadoopfs.exists(hdfsPath)) {
-                    if (s3fs.getFileStatus(s3path).getLen() == hadoopfs.getFileStatus(hdfsPath).getLen()) {
-                        return hdfsPath;
-                    }
+                    return hdfsPath;
                 }
                 else {
                     queue.add(new CopyInfo(s3path, hdfsPath));
