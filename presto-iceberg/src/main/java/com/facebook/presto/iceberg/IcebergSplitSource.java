@@ -34,12 +34,8 @@ import com.netflix.iceberg.Schema;
 import com.netflix.iceberg.StructLike;
 import com.netflix.iceberg.types.Type;
 import com.netflix.iceberg.types.Types.NestedField;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.Path;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -141,6 +137,10 @@ public class IcebergSplitSource
 
     private List<HostAddress> getHostAddresses(String path, long start, long length)
     {
+        /* The code is commented because hdfsEnvironment.getFileSystem(hdfsContext, hadoopPath) returns an instance of PrestoFileSystemCache$FileSystemWrapper
+        which does not delegate the call getFileBlockLocations(string, long, long) to the underlying PrestoS3FileSystem. This results in it invoking the default
+        implementation which ends up calling getFileStatus() method. The getFileStatus() call is delegated to underlying PrestoS3FileSystem which results in a
+        s3 call slowing down the planning process significantly.
         try {
             final Path hadoopPath = new Path(path);
             final BlockLocation[] blocks = hdfsEnvironment.getFileSystem(hdfsContext, hadoopPath).getFileBlockLocations(hadoopPath, start, length);
@@ -149,7 +149,8 @@ public class IcebergSplitSource
         catch (IOException e) {
             // ignore the exception as it only means localization will not happen.
             return Lists.newArrayList(HostAddress.fromString(LOCALHOST + ":-1"));
-        }
+        }*/
+        return Lists.newArrayList(HostAddress.fromString(LOCALHOST + ":65535"));
     }
 
     @Override
