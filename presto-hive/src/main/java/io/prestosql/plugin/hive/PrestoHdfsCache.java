@@ -69,8 +69,11 @@ public class PrestoHdfsCache
                 try {
                     currentCopyInfo = queue.take();
                     if (!hadoopfs.exists(currentCopyInfo.getHdfsPath())) {
-                        FileUtil.copy(s3fs, currentCopyInfo.getS3Path(), hadoopfs, currentCopyInfo.getHdfsPath(), false,
+                        Path hdfsPath = currentCopyInfo.getHdfsPath();
+                        Path tempHdfsPath = new Path(hdfsPath.toString() + "_COPYING_");
+                        FileUtil.copy(s3fs, currentCopyInfo.getS3Path(), hadoopfs, tempHdfsPath, false,
                                 hadoopfs.getConf());
+                        hadoopfs.rename(tempHdfsPath, hdfsPath);
                     }
                 }
                 catch (InterruptedException e) {
