@@ -90,12 +90,12 @@ public class IcebergSplitSource
     public CompletableFuture<ConnectorSplitBatch> getNextBatch(ConnectorPartitionHandle partitionHandle, int maxSize)
     {
         List<ConnectorSplit> splits = new ArrayList<>();
+        final TupleDomain<HiveColumnHandle> predicates = DomainConverter.handleTypeDifference(this.predicates);
         while (scanTaskIterator.hasNext() && maxSize != 0) {
             CombinedScanTask combinedScanTask = scanTaskIterator.next();
             for (FileScanTask scanTask : combinedScanTask.files()) {
                 final List<HivePartitionKey> partitionKeys = getPartitionKeys(scanTask);
                 List<HostAddress> addresses = getHostAddresses(scanTask.file().path().toString(), scanTask.start(), scanTask.length());
-                // final TupleDomain<HiveColumnHandle> residualExpression = ExpressionConverter.fromIceberg(Binder.bind(tableSchema.asStruct(), scanTask.residual()), columnNameToHiveColumnHandleMap, tableSchema, typeRegistry);
                 splits.add(new IcebergSplit(this.database,
                         this.tableName,
                         scanTask.file().path().toString(),
@@ -103,7 +103,10 @@ public class IcebergSplitSource
                         scanTask.length(),
                         addresses,
                         this.tableSchema.columns().stream().collect(Collectors.toMap(NestedField::name, NestedField::fieldId)),
-                        predicates, //TODO this should be replaced by residualExpression once we can address the type issues. This will cause time columns to incorrectly filter for now.
+                        // TODO: We should leverage residual expression and convert that to TupleDomain. The predicate here is used by
+                        // readers for predicate push down at reader level so when we do not use residual expression we are just
+                        // wasting CPU cycles on reader side evaluating condition that we know will always be true.
+                        predicates,
                         partitionKeys,
                         HiveSessionProperties.isForceLocalScheduling(this.session)));
 
