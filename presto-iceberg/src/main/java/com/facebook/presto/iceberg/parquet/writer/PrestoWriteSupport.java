@@ -266,7 +266,7 @@ public class PrestoWriteSupport
         @Override
         public void write(Object obj)
         {
-            long timestamp = hasTimezone? DateTimeEncoding.unpackMillisUtc((Long) obj) : (Long) obj;
+            long timestamp = hasTimezone ? DateTimeEncoding.unpackMillisUtc((Long) obj) : (Long) obj;
             recordConsumer.addLong(TimeUnit.MILLISECONDS.toMicros(timestamp));
         }
     }
