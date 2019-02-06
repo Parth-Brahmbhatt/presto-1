@@ -64,8 +64,8 @@ public class DomainConverter
                 ValueSet transformedValueSet = valueSet;
                 final Type type = domain.getType();
                 final String baseType = type.getTypeSignature().getBase();
-                if (type.equals(TIMESTAMP) || type.equals(TIMESTAMP_WITH_TIME_ZONE) || type.equals(TIME) || type.equals(TIME_WITH_TIME_ZONE)
-                ) {
+                if (type.equals(TIMESTAMP) || type.equals(TIMESTAMP_WITH_TIME_ZONE) || type.equals(TIME)
+                        || type.equals(TIME_WITH_TIME_ZONE)) {
                     if (valueSet instanceof EquatableValueSet) {
                         final EquatableValueSet equatableValueSet = (EquatableValueSet) valueSet;
                         final Set<ValueEntry> values = equatableValueSet.getEntries().stream().map(
@@ -76,13 +76,13 @@ public class DomainConverter
                         List<Range> ranges = new ArrayList<>();
                         for (Range range : valueSet.getRanges().getOrderedRanges()) {
                             Marker low = range.getLow();
-                            if(low.getValueBlock().isPresent()) {
-                                low = new Marker(range.getType(), Optional.of(Utils.nativeValueToBlock(type, convertToMicros(baseType, (Long)range.getLow().getValue()))), range.getLow().getBound());
+                            if (low.getValueBlock().isPresent()) {
+                                low = new Marker(range.getType(), Optional.of(Utils.nativeValueToBlock(type, convertToMicros(baseType, (Long) range.getLow().getValue()))), range.getLow().getBound());
                             }
 
                             Marker high = range.getHigh();
-                            if(high.getValueBlock().isPresent()) {
-                                high = new Marker(range.getType(), Optional.of(Utils.nativeValueToBlock(type, convertToMicros(baseType, (Long)range.getHigh().getValue()))), range.getHigh().getBound());
+                            if (high.getValueBlock().isPresent()) {
+                                high = new Marker(range.getType(), Optional.of(Utils.nativeValueToBlock(type, convertToMicros(baseType, (Long) range.getHigh().getValue()))), range.getHigh().getBound());
                             }
 
                             ranges.add(new Range(low, high));
