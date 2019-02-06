@@ -21,6 +21,7 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.ArrayType;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
+import com.facebook.presto.spi.type.DateTimeEncoding;
 import com.facebook.presto.spi.type.DateType;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
@@ -31,6 +32,7 @@ import com.facebook.presto.spi.type.RealType;
 import com.facebook.presto.spi.type.RowType;
 import com.facebook.presto.spi.type.SqlDecimal;
 import com.facebook.presto.spi.type.TimestampType;
+import com.facebook.presto.spi.type.TimestampWithTimeZoneType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.VarbinaryType;
@@ -45,6 +47,7 @@ import org.apache.parquet.schema.MessageType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.iceberg.type.TypeConveter.convert;
 import static java.lang.Float.intBitsToFloat;
@@ -247,6 +250,13 @@ public class PrestoWriteSupport
     private class TimeStampWriter
             implements ColumnWriter
     {
+        private boolean hasTimezone;
+
+        public TimeStampWriter(boolean hasTimezone)
+        {
+            this.hasTimezone = hasTimezone;
+        }
+
         @Override
         public void write(Block block, int rownum)
         {
@@ -256,7 +266,8 @@ public class PrestoWriteSupport
         @Override
         public void write(Object obj)
         {
-            recordConsumer.addLong((Long) obj);
+            long timestamp = hasTimezone? DateTimeEncoding.unpackMillisUtc((Long) obj) : (Long) obj;
+            recordConsumer.addLong(TimeUnit.MILLISECONDS.toMicros(timestamp));
         }
     }
 
@@ -446,7 +457,6 @@ public class PrestoWriteSupport
             put(com.netflix.iceberg.types.Type.TypeID.INTEGER, new IntWriter());
             put(com.netflix.iceberg.types.Type.TypeID.DATE, new DateWriter());
             //TODO put(com.netflix.iceberg.types.Type.TypeID.TIME, new TimeWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.TIMESTAMP, new TimeStampWriter());
             put(com.netflix.iceberg.types.Type.TypeID.STRING, new StringWriter());
             put(com.netflix.iceberg.types.Type.TypeID.UUID, new StringWriter());
             put(com.netflix.iceberg.types.Type.TypeID.FIXED, new BinaryWriter());
@@ -469,6 +479,9 @@ public class PrestoWriteSupport
                     return new MapWriter((MapType) type);
                 case STRUCT:
                     return new RowWriter((RowType) type);
+                case TIMESTAMP:
+                    boolean hasTimezone = type instanceof TimestampWithTimeZoneType;
+                    return new TimeStampWriter(hasTimezone);
                 default:
                     throw new UnsupportedOperationException(" presto does not support " + icebergType);
             }
