@@ -15,6 +15,7 @@ package io.prestosql.plugin.hive;
 
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
+import com.facebook.presto.hive.PrestoHdfsCacheStats;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Provides;
@@ -35,6 +36,7 @@ import io.prestosql.plugin.hive.parquet.ParquetWriterConfig;
 import io.prestosql.plugin.hive.rcfile.RcFilePageSourceFactory;
 import io.prestosql.plugin.hive.s3select.PrestoS3ClientFactory;
 import io.prestosql.plugin.hive.s3select.S3SelectRecordCursorProvider;
+import io.prestosql.plugin.hive.util.HiveFileIterator;
 import io.prestosql.spi.connector.ConnectorNodePartitioningProvider;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
@@ -127,6 +129,9 @@ public class HiveModule
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
 
         newSetBinder(binder, SystemTable.class);
+
+        binder.bind(PrestoHdfsCacheStats.class).toInstance(HiveFileIterator.getHdfsCacheStats());
+        newExporter(binder).export(PrestoHdfsCacheStats.class).as(generator -> generator.generatedNameOf(PrestoHdfsCache.class));
     }
 
     @Singleton

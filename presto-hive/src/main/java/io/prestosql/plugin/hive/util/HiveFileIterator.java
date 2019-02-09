@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive.util;
 
+import com.facebook.presto.hive.PrestoHdfsCacheStats;
 import com.google.common.collect.AbstractIterator;
 import io.airlift.stats.TimeStat;
 import io.prestosql.plugin.hive.DirectoryLister;
@@ -58,6 +59,13 @@ public class HiveFileIterator
     private Iterator<LocatedFileStatus> remoteIterator = emptyIterator();
     private final PrestoHdfsCache prestoHdfsCache;
     private final boolean isHdfsDeployed;
+
+    private static final PrestoHdfsCacheStats STATS = new PrestoHdfsCacheStats();
+
+    public static PrestoHdfsCacheStats getHdfsCacheStats()
+    {
+        return STATS;
+    }
 
     public HiveFileIterator(
             Table table,
@@ -109,9 +117,14 @@ public class HiveFileIterator
                 if (isHdfsDeployed) {
                     try {
                         Path s3Path = status.getPath();
+                        STATS.newFileRead();
                         Path s3OrHdfsPath = prestoHdfsCache.getHdfsPathOrCopyToHdfs(s3Path);
                         if (!s3OrHdfsPath.equals(s3Path)) {
                             status = prestoHdfsCache.getLocatedStatus(s3OrHdfsPath);
+                            STATS.newFileReadFromHDFS();
+                        }
+                        else {
+                            STATS.newFileReadFromS3();
                         }
                     }
                     catch (IOException ignored) {
