@@ -16,6 +16,8 @@ package com.facebook.presto.iceberg;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveColumnHandle;
 import com.facebook.presto.hive.HiveWrittenPartitions;
+import com.facebook.presto.hive.LocationHandle;
+import com.facebook.presto.hive.LocationService;
 import com.facebook.presto.hive.TransactionalMetadata;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.hive.metastore.Table;
@@ -70,7 +72,6 @@ import static com.facebook.presto.hive.HiveUtil.schemaTableName;
 import static com.facebook.presto.hive.util.ConfigurationUtils.getInitialConfiguration;
 import static com.facebook.presto.iceberg.IcebergUtil.getDataPath;
 import static com.facebook.presto.iceberg.IcebergUtil.getIcebergTable;
-import static com.facebook.presto.iceberg.IcebergUtil.getTablePath;
 import static com.facebook.presto.iceberg.IcebergUtil.isIcebergTable;
 import static com.netflix.iceberg.types.Types.NestedField.required;
 import static java.util.Collections.EMPTY_LIST;
@@ -92,17 +93,23 @@ public class IcebergMetadata
     private final SemiTransactionalHiveMetastore metastore;
     private final JsonCodec<CommitTaskData> jsonCodec;
     private Transaction transaction;
+    private IcebergUtil icebergUtil;
+    private final LocationService locationService;
 
     public IcebergMetadata(
             SemiTransactionalHiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
-            JsonCodec<CommitTaskData> jsonCodec)
+            JsonCodec<CommitTaskData> jsonCodec,
+            IcebergUtil icebergUtil,
+            LocationService locationService)
     {
         this.hdfsEnvironment = hdfsEnvironment;
         this.typeManager = typeManager;
         this.metastore = metastore;
         this.jsonCodec = jsonCodec;
+        this.icebergUtil = icebergUtil;
+        this.locationService = locationService;
     }
 
     @Override
@@ -177,7 +184,7 @@ public class IcebergMetadata
         IcebergTableHandle tbl = (IcebergTableHandle) tableHandle;
         final Configuration configuration = getConfiguration(session, tbl.getSchemaName());
         final com.netflix.iceberg.Table icebergTable = getIcebergTable(tbl.getSchemaName(), tbl.getTableName(), configuration);
-        final List<HiveColumnHandle> columns = IcebergUtil.getColumns(icebergTable.schema(), icebergTable.spec(), typeManager);
+        final List<HiveColumnHandle> columns = icebergUtil.getColumns(icebergTable.schema(), icebergTable.spec(), typeManager);
         return columns.stream().collect(toMap(col -> col.getName(), identity()));
     }
 
@@ -278,13 +285,15 @@ public class IcebergMetadata
         final HiveTables table = IcebergUtil.getHiveTables(configuration);
         //TODO see if there is a way to store this as transaction state.
         this.transaction = table.beginCreate(schema, partitionSpec, schemaName, tableName);
-        final List<HiveColumnHandle> hiveColumnHandles = IcebergUtil.getColumns(schema, partitionSpec, typeManager);
+        final List<HiveColumnHandle> hiveColumnHandles = icebergUtil.getColumns(schema, partitionSpec, typeManager);
+        LocationHandle locationHandle = locationService.forNewTable(metastore, session, schemaName, tableName);
+        Path targetPath = locationService.getQueryWriteInfo(locationHandle).getTargetPath();
         return new IcebergInsertTableHandle(
                 schemaName,
                 tableName,
                 SchemaParser.toJson(transaction.table().schema()),
                 hiveColumnHandles,
-                getDataPath(getTablePath(schemaName, tableName, configuration)),
+                targetPath.toString(),
                 FileFormat.PARQUET);
     }
 
@@ -311,7 +320,7 @@ public class IcebergMetadata
         final com.netflix.iceberg.Table icebergTable = getIcebergTable(tbl.getSchemaName(), tbl.getTableName(), configuration);
         this.transaction = icebergTable.newTransaction();
         String location = icebergTable.location();
-        final List<HiveColumnHandle> columns = IcebergUtil.getColumns(icebergTable.schema(), icebergTable.spec(), typeManager);
+        final List<HiveColumnHandle> columns = icebergUtil.getColumns(icebergTable.schema(), icebergTable.spec(), typeManager);
         return new IcebergInsertTableHandle(
                 tbl.getSchemaName(),
                 tbl.getTableName(),

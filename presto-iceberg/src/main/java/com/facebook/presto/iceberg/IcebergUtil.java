@@ -49,7 +49,6 @@ class IcebergUtil
 {
     public static final String ICEBERG_PROPERTY_NAME = "table_type";
     public static final String ICEBERG_PROPERTY_VALUE = "iceberg";
-    public static final String HIVE_WAREHOUSE_DIR = "metastore.warehouse.dir";
     private static final TypeTranslator hiveTypeTranslator = new HiveTypeTranslator();
     private static final String PATH_SEPERATOR = "/";
     public static final String DATA_DIR_NAME = "data";
@@ -72,7 +71,7 @@ class IcebergUtil
         return new HiveTables(configuration);
     }
 
-    public static final List<HiveColumnHandle> getColumns(Schema schema, PartitionSpec spec, TypeManager typeManager)
+    public final List<HiveColumnHandle> getColumns(Schema schema, PartitionSpec spec, TypeManager typeManager)
     {
         final List<Types.NestedField> columns = schema.columns();
         int columnIndex = 0;
@@ -119,11 +118,6 @@ class IcebergUtil
     public static final String getDataPath(String icebergLocation)
     {
         return icebergLocation.endsWith(PATH_SEPERATOR) ? icebergLocation + DATA_DIR_NAME : icebergLocation + PATH_SEPERATOR + DATA_DIR_NAME;
-    }
-
-    public static final String getTablePath(String schemaName, String tableName, Configuration configuration)
-    {
-        return new Path(new Path(configuration.get(HIVE_WAREHOUSE_DIR), String.format("%s.db", schemaName)), tableName).toString();
     }
 
     public static final FileFormat getFileFormat(Table table)

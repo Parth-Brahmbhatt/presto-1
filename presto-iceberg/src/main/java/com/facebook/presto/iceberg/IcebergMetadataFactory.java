@@ -16,6 +16,7 @@ package com.facebook.presto.iceberg;
 import com.facebook.presto.hive.ForHiveClient;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveClientConfig;
+import com.facebook.presto.hive.LocationService;
 import com.facebook.presto.hive.TransactionalMetadata;
 import com.facebook.presto.hive.metastore.CachingHiveMetastore;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
@@ -47,7 +48,9 @@ public class IcebergMetadataFactory
                 metastore,
                 hdfsEnvironment,
                 typeManager,
-                taskCommitCodec);
+                taskCommitCodec,
+                icebergUtil,
+                locationService);
     }
 
     private final boolean skipDeletionForAlter;
@@ -57,6 +60,8 @@ public class IcebergMetadataFactory
     private final TypeManager typeManager;
     private final JsonCodec<CommitTaskData> taskCommitCodec;
     private final BoundedExecutor renameExecution;
+    private final IcebergUtil icebergUtil;
+    private final LocationService locationService;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -66,7 +71,9 @@ public class IcebergMetadataFactory
             HdfsEnvironment hdfsEnvironment,
             @ForHiveClient ExecutorService executorService,
             TypeManager typeManager,
-            JsonCodec<CommitTaskData> commitTaskDataJsonCodec)
+            JsonCodec<CommitTaskData> commitTaskDataJsonCodec,
+            IcebergUtil icebergUtil,
+            LocationService locationService)
     {
         this(
                 metastore,
@@ -76,7 +83,9 @@ public class IcebergMetadataFactory
                 hiveClientConfig.getPerTransactionMetastoreCacheMaximumSize(),
                 typeManager,
                 executorService,
-                commitTaskDataJsonCodec);
+                commitTaskDataJsonCodec,
+                icebergUtil,
+                locationService);
     }
 
     public IcebergMetadataFactory(
@@ -87,7 +96,9 @@ public class IcebergMetadataFactory
             long perTransactionCacheMaximumSize,
             TypeManager typeManager,
             ExecutorService executorService,
-            JsonCodec<CommitTaskData> commitTaskDataJsonCodec)
+            JsonCodec<CommitTaskData> commitTaskDataJsonCodec,
+            IcebergUtil icebergUtil,
+            LocationService locationService)
     {
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.perTransactionCacheMaximumSize = perTransactionCacheMaximumSize;
@@ -95,6 +106,8 @@ public class IcebergMetadataFactory
         this.metastore = requireNonNull(metastore, "metastore is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
+        this.icebergUtil = icebergUtil;
+        this.locationService = locationService;
 
         renameExecution = new BoundedExecutor(executorService, maxConcurrentFileRenames);
         this.taskCommitCodec = commitTaskDataJsonCodec;
