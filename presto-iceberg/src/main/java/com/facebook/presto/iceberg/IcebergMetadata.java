@@ -15,6 +15,7 @@ package com.facebook.presto.iceberg;
 
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveColumnHandle;
+import com.facebook.presto.hive.HiveUtil;
 import com.facebook.presto.hive.HiveWrittenPartitions;
 import com.facebook.presto.hive.LocationHandle;
 import com.facebook.presto.hive.LocationService;
@@ -34,24 +35,34 @@ import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutResult;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.Constraint;
+import com.facebook.presto.spi.InMemoryRecordSet;
+import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
+import com.facebook.presto.spi.SystemTable;
 import com.facebook.presto.spi.TableNotFoundException;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorOutputMetadata;
+import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.predicate.NullableValue;
+import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.statistics.ComputedStatistics;
 import com.facebook.presto.spi.statistics.TableStatistics;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.netflix.iceberg.AppendFiles;
 import com.netflix.iceberg.DataFiles;
 import com.netflix.iceberg.FileFormat;
 import com.netflix.iceberg.PartitionSpec;
+import com.netflix.iceberg.ScanSummary;
 import com.netflix.iceberg.Schema;
 import com.netflix.iceberg.SchemaParser;
+import com.netflix.iceberg.TableScan;
 import com.netflix.iceberg.Transaction;
+import com.netflix.iceberg.expressions.Expression;
 import com.netflix.iceberg.hadoop.HadoopInputFile;
 import com.netflix.iceberg.hive.HiveTables;
 import com.netflix.iceberg.types.Types;
@@ -59,6 +70,7 @@ import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.joda.time.DateTimeZone;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -66,13 +78,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
+import static com.facebook.presto.hive.HiveMetadata.getSourceTableNameForPartitionsTable;
+import static com.facebook.presto.hive.HiveMetadata.isPartitionsSystemTable;
 import static com.facebook.presto.hive.HiveTableProperties.getPartitionedBy;
 import static com.facebook.presto.hive.HiveUtil.schemaTableName;
-import static com.facebook.presto.hive.util.ConfigurationUtils.getInitialConfiguration;
 import static com.facebook.presto.iceberg.IcebergUtil.getDataPath;
 import static com.facebook.presto.iceberg.IcebergUtil.getIcebergTable;
 import static com.facebook.presto.iceberg.IcebergUtil.isIcebergTable;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.netflix.iceberg.types.Types.NestedField.required;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.emptyMap;
@@ -131,6 +148,85 @@ public class IcebergMetadata
             }
         }
         return null;
+    }
+
+    @Override
+    public Optional<SystemTable> getSystemTable(ConnectorSession session, SchemaTableName tableName)
+    {
+        if (!isPartitionsSystemTable(tableName)) {
+            return Optional.empty();
+        }
+
+        SchemaTableName sourceTableName = getSourceTableNameForPartitionsTable(tableName);
+        IcebergTableHandle sourceTableHandle = getTableHandle(session, sourceTableName);
+        final List<HiveColumnHandle> partitionColumns = getColumnHandles(session, sourceTableHandle)
+                .entrySet().stream().filter(e -> ((HiveColumnHandle) e.getValue()).isPartitionKey())
+                .map(e -> (HiveColumnHandle) e.getValue())
+                .collect(Collectors.toList());
+
+        if (partitionColumns == null || partitionColumns.isEmpty()) {
+            return Optional.empty();
+        }
+
+        final List<ColumnMetadata> columnMetadatas = partitionColumns.stream().map(columnHandle -> getColumnMetadata(session, sourceTableHandle, columnHandle))
+                .collect(Collectors.toList());
+        Map<Integer, HiveColumnHandle> fieldIdToColumnHandle =
+                IntStream.range(0, columnMetadatas.size())
+                        .boxed()
+                        .collect(toImmutableMap(identity(), partitionColumns::get));
+
+        List<Type> partitionColumnTypes = partitionColumns.stream()
+                .map(HiveColumnHandle::getTypeSignature)
+                .map(typeManager::getType)
+                .collect(toImmutableList());
+
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+
+        final Splitter.MapSplitter splitter = Splitter.on("/").withKeyValueSeparator('=');
+
+        return Optional.of(new SystemTable()
+        {
+            @Override
+            public Distribution getDistribution()
+            {
+                return Distribution.SINGLE_COORDINATOR;
+            }
+
+            @Override
+            public ConnectorTableMetadata getTableMetadata()
+            {
+                return new ConnectorTableMetadata(sourceTableName, columnMetadatas);
+            }
+
+            @Override
+            public RecordCursor cursor(ConnectorTransactionHandle transactionHandle, ConnectorSession session, TupleDomain<Integer> constraint)
+            {
+                ClassLoader cl = Thread.currentThread().getContextClassLoader();
+                try {
+                    Thread.currentThread().setContextClassLoader(classLoader);
+                    TupleDomain<HiveColumnHandle> targetTupleDomain = constraint.transform(fieldIdToColumnHandle::get);
+                    final Expression expression = ExpressionConverter.toIceberg(targetTupleDomain, session);
+                    final com.netflix.iceberg.Table icebergTable = icebergUtil.getIcebergTable(sourceTableHandle.getSchemaName(), sourceTableName.getTableName(), getConfiguration(session, sourceTableName.getSchemaName()));
+                    final TableScan scan = icebergTable.newScan().filter(expression);
+                    final Set<String> partitionVals = ScanSummary.of(scan).build().keySet();
+
+                    final List<ImmutableList<Object>> records = partitionVals.stream().map(partitionValue -> {
+                        final ImmutableList.Builder<Object> builder = ImmutableList.builder();
+                        final Map<String, String> partitionKeyVal = splitter.split(partitionValue);
+                        for (HiveColumnHandle partitionColumn : partitionColumns) {
+                            final NullableValue value = HiveUtil.parsePartitionValue(partitionColumn.getName(), partitionKeyVal.get(partitionColumn.getName()), typeManager.getType(partitionColumn.getTypeSignature()), DateTimeZone.UTC);
+                            builder.add(value.getValue());
+                        }
+                        return builder.build();
+                    }).collect(toList());
+
+                    return new InMemoryRecordSet(partitionColumnTypes, records).cursor();
+                }
+                finally {
+                    Thread.currentThread().setContextClassLoader(cl);
+                }
+            }
+        });
     }
 
     @Override
@@ -346,7 +442,7 @@ public class IcebergMetadata
         for (CommitTaskData commitTaskData : commitTasks) {
             final DataFiles.Builder builder;
             builder = DataFiles.builder(transaction.table().spec())
-                    .withInputFile(HadoopInputFile.fromLocation(commitTaskData.getPath(), getInitialConfiguration()))
+                    .withInputFile(HadoopInputFile.fromLocation(commitTaskData.getPath(), getConfiguration(session, icebergTable.getSchemaName())))
                     .withFormat(icebergTable.getFileFormat())
                     .withMetrics(MetricsParser.fromJson(commitTaskData.getMetricsJson()));
 
