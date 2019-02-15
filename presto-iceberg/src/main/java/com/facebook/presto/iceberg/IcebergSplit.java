@@ -40,6 +40,8 @@ public class IcebergSplit
     private final TupleDomain<HiveColumnHandle> effectivePredicate;
     private final List<HivePartitionKey> partitionKeys;
     private final boolean forceLocalScheduling;
+    private final Long snapshotId;
+    private final Long snapshotTimestamp;
 
     @JsonCreator
     public IcebergSplit(
@@ -52,7 +54,9 @@ public class IcebergSplit
             @JsonProperty("nameToId") Map<String, Integer> nameToId,
             @JsonProperty("effectivePredicate") TupleDomain<HiveColumnHandle> effectivePredicate,
             @JsonProperty("partitionKeys") List<HivePartitionKey> partitionKeys,
-            @JsonProperty("forceLocalScheduling") boolean forceLocalScheduling)
+            @JsonProperty("forceLocalScheduling") boolean forceLocalScheduling,
+            @JsonProperty("snapshotId") Long snapshotId,
+            @JsonProperty("snapshotTimestamp") Long snapshotTimestamp)
     {
         this.database = database;
         this.table = table;
@@ -64,6 +68,8 @@ public class IcebergSplit
         this.effectivePredicate = effectivePredicate;
         this.partitionKeys = partitionKeys;
         this.forceLocalScheduling = forceLocalScheduling;
+        this.snapshotId = snapshotId;
+        this.snapshotTimestamp = snapshotTimestamp;
     }
 
     @Override
@@ -147,6 +153,18 @@ public class IcebergSplit
         return forceLocalScheduling;
     }
 
+    @JsonProperty
+    public Long getSnapshotId()
+    {
+        return snapshotId;
+    }
+
+    @JsonProperty
+    public Long getSnapshotTimestamp()
+    {
+        return snapshotTimestamp;
+    }
+
     @Override
     public String toString()
     {
@@ -155,6 +173,8 @@ public class IcebergSplit
                 .addValue(start)
                 .addValue(length)
                 .addValue(effectivePredicate)
+                .addValue(snapshotId)
+                .addValue(snapshotTimestamp)
                 .toString();
     }
 }
