@@ -108,7 +108,7 @@ public class PrestoWriteSupport
 
     public List<Type> getPrestoType(List<HiveColumnHandle> columns)
     {
-        return columns.stream().map(col -> convert(icebergSchema.findType(col.getName()), typeManager)).collect(toList());
+        return columns.stream().filter(column -> !column.isHidden()).map(col -> convert(icebergSchema.findType(col.getName()), typeManager)).collect(toList());
     }
 
     private interface ColumnWriter

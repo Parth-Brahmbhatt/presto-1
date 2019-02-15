@@ -66,9 +66,11 @@ public class ExpressionConverter
             final Map<HiveColumnHandle, Domain> tDomainMap = tupleDomain.getDomains().get();
             Expression expression = Expressions.alwaysTrue();
             for (Map.Entry<HiveColumnHandle, Domain> tDomainEntry : tDomainMap.entrySet()) {
-                final HiveColumnHandle key = tDomainEntry.getKey();
+                final HiveColumnHandle columnHandle = tDomainEntry.getKey();
                 final Domain domain = tDomainEntry.getValue();
-                expression = Expressions.and(expression, toIceberg(key, domain, session));
+                if (!columnHandle.isHidden()) {
+                    expression = Expressions.and(expression, toIceberg(columnHandle, domain, session));
+                }
             }
             return expression;
         }
