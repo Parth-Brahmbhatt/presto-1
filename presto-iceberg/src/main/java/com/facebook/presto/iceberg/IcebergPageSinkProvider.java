@@ -14,7 +14,6 @@
 package com.facebook.presto.iceberg;
 
 import com.facebook.presto.hive.HdfsEnvironment;
-import com.facebook.presto.hive.util.ConfigurationUtils;
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
 import com.facebook.presto.spi.ConnectorOutputTableHandle;
 import com.facebook.presto.spi.ConnectorPageSink;
@@ -22,8 +21,11 @@ import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.connector.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.type.TypeManager;
+import com.netflix.iceberg.PartitionSpecParser;
+import com.netflix.iceberg.Schema;
 import com.netflix.iceberg.SchemaParser;
 import io.airlift.json.JsonCodec;
+import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 
@@ -54,10 +56,13 @@ public class IcebergPageSinkProvider
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorInsertTableHandle insertTableHandle)
     {
         final IcebergInsertTableHandle tableHandle = (IcebergInsertTableHandle) insertTableHandle;
+        final HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(session, tableHandle.getSchemaName(), tableHandle.getTableName());
+        final Schema schema = SchemaParser.fromJson(tableHandle.getSchemaAsJson());
         return new IcebergPageSink(
-                SchemaParser.fromJson(tableHandle.getSchemaAsJson()),
+                schema,
+                PartitionSpecParser.fromJson(schema, tableHandle.getPartitionSpecAsJson()),
                 tableHandle.getFilePrefix(),
-                ConfigurationUtils.getInitialConfiguration(),
+                hdfsEnvironment.getConfiguration(hdfsContext, new Path(tableHandle.getFilePrefix())),
                 tableHandle.getInputColumns(),
                 typeManager,
                 jsonCodec,

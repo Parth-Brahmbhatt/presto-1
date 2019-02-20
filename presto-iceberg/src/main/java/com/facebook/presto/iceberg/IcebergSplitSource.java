@@ -35,14 +35,24 @@ import com.netflix.iceberg.StructLike;
 import com.netflix.iceberg.types.Type;
 import com.netflix.iceberg.types.Types.NestedField;
 
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.hive.HivePartitionKey.HIVE_DEFAULT_DYNAMIC_PARTITION;
 import static com.facebook.presto.iceberg.IcebergUtil.getIdentityPartitions;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class IcebergSplitSource
         implements ConnectorSplitSource
@@ -140,8 +150,31 @@ public class IcebergSplitSource
             Type sourceType = spec.schema().findType(field.sourceId());
             final Type partitionType = field.transform().getResultType(sourceType);
             final Class<?> javaClass = partitionType.typeId().javaClass();
-            final String value = partition.get(i, javaClass).toString();
-            partitionKeys.add(new HivePartitionKey(name, value));
+            Object value = partition.get(i, javaClass);
+            String partitionValue = HIVE_DEFAULT_DYNAMIC_PARTITION;
+            if (value != null) {
+                switch (partitionType.typeId()) {
+                    case DATE:
+                        Instant instant = Instant.EPOCH.plus((Integer) value, ChronoUnit.DAYS);
+                        final ZonedDateTime date = ZonedDateTime.ofInstant(instant, ZoneId.of("UTC"));
+                        final DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                        partitionValue = df.format(date);
+                        break;
+                    case TIMESTAMP:
+                        final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+                        final long millis = TimeUnit.MICROSECONDS.toMillis((Long) value);
+                        partitionValue = dateTimeFormatter.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.of("UTC")));
+                        break;
+                    case FIXED:
+                    case BINARY:
+                        byte[] bytes = ((ByteBuffer) value).array();
+                        partitionValue = new String(bytes, 0, bytes.length, UTF_8);
+                        break;
+                    default:
+                        partitionValue = value.toString();
+                }
+            }
+            partitionKeys.add(new HivePartitionKey(name, partitionValue));
         }
         return partitionKeys;
     }

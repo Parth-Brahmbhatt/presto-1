@@ -21,16 +21,19 @@ public class CommitTaskData
     private String path;
     private String metricsJson;
     private String partitionPath;
+    private String partitionDataJson;
 
     @JsonCreator
     public CommitTaskData(
             @JsonProperty("path") String path,
             @JsonProperty("metricsJson") String metricsJson,
-            @JsonProperty("partitionPath") String partitionPath)
+            @JsonProperty("partitionPath") String partitionPath,
+            @JsonProperty("partitionDataJson") String partitionDataJson)
     {
         this.path = path;
         this.metricsJson = metricsJson;
         this.partitionPath = partitionPath;
+        this.partitionDataJson = partitionDataJson;
     }
 
     @JsonProperty
@@ -49,5 +52,11 @@ public class CommitTaskData
     public String getPartitionPath()
     {
         return partitionPath;
+    }
+
+    @JsonProperty
+    public String getPartitionDataJson()
+    {
+        return partitionDataJson;
     }
 }

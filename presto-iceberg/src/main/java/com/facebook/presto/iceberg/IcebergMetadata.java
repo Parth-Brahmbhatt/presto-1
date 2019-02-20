@@ -57,6 +57,7 @@ import com.netflix.iceberg.AppendFiles;
 import com.netflix.iceberg.DataFiles;
 import com.netflix.iceberg.FileFormat;
 import com.netflix.iceberg.PartitionSpec;
+import com.netflix.iceberg.PartitionSpecParser;
 import com.netflix.iceberg.ScanSummary;
 import com.netflix.iceberg.Schema;
 import com.netflix.iceberg.SchemaParser;
@@ -386,6 +387,7 @@ public class IcebergMetadata
                 schemaName,
                 tableName,
                 SchemaParser.toJson(transaction.table().schema()),
+                PartitionSpecParser.toJson(partitionSpec),
                 hiveColumnHandles,
                 targetPath.toString(),
                 FileFormat.PARQUET);
@@ -419,6 +421,7 @@ public class IcebergMetadata
                 tbl.getSchemaName(),
                 tbl.getTableName(),
                 SchemaParser.toJson(icebergTable.schema()),
+                PartitionSpecParser.toJson(icebergTable.spec()),
                 columns,
                 icebergUtil.getDataPath(location),
                 icebergUtil.getFileFormat(icebergTable));
@@ -435,7 +438,11 @@ public class IcebergMetadata
     {
         final List<CommitTaskData> commitTasks = fragments.stream().map(slice -> jsonCodec.fromJson(slice.getBytes())).collect(toList());
         IcebergInsertTableHandle icebergTable = (IcebergInsertTableHandle) insertHandle;
-
+        final com.netflix.iceberg.types.Type[] partitionColumnTypes = icebergTable.getInputColumns().stream()
+                .filter(col -> col.isPartitionKey())
+                .map(col -> typeManager.getType(col.getTypeSignature()))
+                .map(type -> TypeConveter.convert(type))
+                .toArray(com.netflix.iceberg.types.Type[]::new);
         final AppendFiles appendFiles = transaction.newFastAppend();
         for (CommitTaskData commitTaskData : commitTasks) {
             final DataFiles.Builder builder;
@@ -445,7 +452,7 @@ public class IcebergMetadata
                     .withMetrics(MetricsParser.fromJson(commitTaskData.getMetricsJson()));
 
             if (!transaction.table().spec().fields().isEmpty()) {
-                builder.withPartitionPath(commitTaskData.getPartitionPath());
+                builder.withPartition(PartitionData.fromJson(commitTaskData.getPartitionDataJson(), partitionColumnTypes));
             }
             appendFiles.appendFile(builder.build());
         }
