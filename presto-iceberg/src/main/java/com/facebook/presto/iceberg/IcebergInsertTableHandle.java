@@ -28,6 +28,7 @@ public class IcebergInsertTableHandle
     private final String schemaName;
     private final String tableName;
     private final String schemaAsJson;
+    private final String partitionSpecAsJson;
     private final List<HiveColumnHandle> inputColumns;
     private final String filePrefix;
     private final FileFormat fileFormat;
@@ -48,6 +49,12 @@ public class IcebergInsertTableHandle
     public String getSchemaAsJson()
     {
         return schemaAsJson;
+    }
+
+    @JsonProperty("partitionSpecAsJson")
+    public String getPartitionSpecAsJson()
+    {
+        return partitionSpecAsJson;
     }
 
     @JsonProperty("inputColumns")
@@ -73,6 +80,7 @@ public class IcebergInsertTableHandle
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("schemaAsJson") String schemaAsJson,
+            @JsonProperty("partitionSpecAsJson") String partitionSpecAsJson,
             @JsonProperty("inputColumns") List<HiveColumnHandle> inputColumns,
             @JsonProperty("filePrefix") String filePrefix,
             @JsonProperty("fileFormat") FileFormat fileFormat)
@@ -80,6 +88,7 @@ public class IcebergInsertTableHandle
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.schemaAsJson = schemaAsJson;
+        this.partitionSpecAsJson = partitionSpecAsJson;
         this.inputColumns = inputColumns;
         this.filePrefix = filePrefix;
         this.fileFormat = fileFormat;

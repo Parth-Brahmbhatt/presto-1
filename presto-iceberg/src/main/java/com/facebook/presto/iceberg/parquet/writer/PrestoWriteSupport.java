@@ -50,6 +50,16 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.iceberg.type.TypeConveter.convert;
+import static com.netflix.iceberg.types.Type.TypeID.BINARY;
+import static com.netflix.iceberg.types.Type.TypeID.BOOLEAN;
+import static com.netflix.iceberg.types.Type.TypeID.DATE;
+import static com.netflix.iceberg.types.Type.TypeID.DOUBLE;
+import static com.netflix.iceberg.types.Type.TypeID.FIXED;
+import static com.netflix.iceberg.types.Type.TypeID.FLOAT;
+import static com.netflix.iceberg.types.Type.TypeID.INTEGER;
+import static com.netflix.iceberg.types.Type.TypeID.LONG;
+import static com.netflix.iceberg.types.Type.TypeID.STRING;
+import static com.netflix.iceberg.types.Type.TypeID.UUID;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.Collections.EMPTY_MAP;
@@ -111,16 +121,16 @@ public class PrestoWriteSupport
         return columns.stream().filter(column -> !column.isHidden()).map(col -> convert(icebergSchema.findType(col.getName()), typeManager)).collect(toList());
     }
 
-    private interface ColumnWriter
+    private interface ColumnWriter<T>
     {
         void write(Block block, int rownum);
 
-        void write(Object obj);
+        void write(T obj);
     }
 
     // TODO instead of Type.get***() method we can use com.facebook.presto.spi.type.TypeUtils.readNativeValue
     private class IntWriter
-            implements ColumnWriter
+            implements ColumnWriter<Integer>
     {
         @Override
         public void write(Block block, int rownum)
@@ -129,14 +139,14 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Integer obj)
         {
-            recordConsumer.addInteger((Integer) obj);
+            recordConsumer.addInteger(obj);
         }
     }
 
     private class BooleanWriter
-            implements ColumnWriter
+            implements ColumnWriter<Boolean>
     {
         @Override
         public void write(Block block, int rownum)
@@ -145,14 +155,14 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Boolean obj)
         {
-            recordConsumer.addBoolean((Boolean) obj);
+            recordConsumer.addBoolean(obj);
         }
     }
 
     private class LongWriter
-            implements ColumnWriter
+            implements ColumnWriter<Long>
     {
         @Override
         public void write(Block block, int rownum)
@@ -161,14 +171,14 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Long obj)
         {
-            recordConsumer.addLong((Long) obj);
+            recordConsumer.addLong(obj);
         }
     }
 
     private class BinaryWriter
-            implements ColumnWriter
+            implements ColumnWriter<byte[]>
     {
         @Override
         public void write(Block block, int rownum)
@@ -177,14 +187,14 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(byte[] obj)
         {
-            recordConsumer.addBinary(Binary.fromConstantByteArray((byte[]) obj));
+            recordConsumer.addBinary(Binary.fromConstantByteArray(obj));
         }
     }
 
     private class FloatWriter
-            implements ColumnWriter
+            implements ColumnWriter<Float>
     {
         @Override
         public void write(Block block, int rownum)
@@ -193,14 +203,14 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Float obj)
         {
-            recordConsumer.addFloat((Float) obj);
+            recordConsumer.addFloat(obj);
         }
     }
 
     private class DoubleWriter
-            implements ColumnWriter
+            implements ColumnWriter<Double>
     {
         @Override
         public void write(Block block, int rownum)
@@ -209,30 +219,30 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Double obj)
         {
-            recordConsumer.addDouble((Double) obj);
+            recordConsumer.addDouble(obj);
         }
     }
 
     private class StringWriter
-            implements ColumnWriter
+            implements ColumnWriter<String>
     {
         @Override
         public void write(Block block, int rownum)
         {
-            write(VarcharType.VARCHAR.getObjectValue(session, block, rownum));
+            write((String) VarcharType.VARCHAR.getObjectValue(session, block, rownum));
         }
 
         @Override
-        public void write(Object obj)
+        public void write(String obj)
         {
-            recordConsumer.addBinary(Binary.fromReusedByteArray(((String) obj).getBytes()));
+            recordConsumer.addBinary(Binary.fromReusedByteArray(obj.getBytes()));
         }
     }
 
     private class DateWriter
-            implements ColumnWriter
+            implements ColumnWriter<Long>
     {
         @Override
         public void write(Block block, int rownum)
@@ -241,14 +251,14 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Long obj)
         {
-            recordConsumer.addLong((Long) obj);
+            recordConsumer.addInteger(obj.intValue());
         }
     }
 
     private class TimeStampWriter
-            implements ColumnWriter
+            implements ColumnWriter<Long>
     {
         private boolean hasTimezone;
 
@@ -264,15 +274,15 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Long obj)
         {
-            long timestamp = hasTimezone ? DateTimeEncoding.unpackMillisUtc((Long) obj) : (Long) obj;
+            long timestamp = hasTimezone ? DateTimeEncoding.unpackMillisUtc(obj) : obj;
             recordConsumer.addLong(TimeUnit.MILLISECONDS.toMicros(timestamp));
         }
     }
 
     private class DecimalWriter
-            implements ColumnWriter
+            implements ColumnWriter<SqlDecimal>
     {
         private static final int MAX_INT_PRECISION = 8;
         private final DecimalType decimalType;
@@ -285,13 +295,12 @@ public class PrestoWriteSupport
         @Override
         public void write(Block block, int rownum)
         {
-            write(decimalType.getObjectValue(session, block, rownum));
+            write((SqlDecimal) decimalType.getObjectValue(session, block, rownum));
         }
 
         @Override
-        public void write(Object obj)
+        public void write(SqlDecimal sqlDecimal)
         {
-            final SqlDecimal sqlDecimal = (SqlDecimal) obj;
             if (decimalType.getPrecision() <= MAX_INT_PRECISION) {
                 recordConsumer.addInteger(sqlDecimal.getUnscaledValue().intValueExact());
             }
@@ -305,7 +314,7 @@ public class PrestoWriteSupport
     }
 
     private class ListWriter
-            implements ColumnWriter
+            implements ColumnWriter<Object[]>
     {
         private final ArrayType arrayType;
         private final ColumnWriter baseTypeWriter;
@@ -324,9 +333,8 @@ public class PrestoWriteSupport
         }
 
         @Override
-        public void write(Object arr)
+        public void write(Object[] elements)
         {
-            Object[] elements = (Object[]) arr;
             recordConsumer.startGroup();
             if (elements != null && elements.length != 0) {
                 recordConsumer.startField("list", 0);
@@ -344,7 +352,7 @@ public class PrestoWriteSupport
     }
 
     private class MapWriter
-            implements ColumnWriter
+            implements ColumnWriter<Map>
     {
         private final MapType mapType;
         private final ColumnWriter keyWriter;
@@ -360,13 +368,12 @@ public class PrestoWriteSupport
         @Override
         public void write(Block block, int rownum)
         {
-            write(this.mapType.getObjectValue(session, block, rownum));
+            write((Map) this.mapType.getObjectValue(session, block, rownum));
         }
 
         @Override
-        public void write(Object obj)
+        public void write(Map map)
         {
-            Map map = (Map) obj;
             recordConsumer.startGroup();
             if (map != null && map.size() != 0) {
                 recordConsumer.startField("key_value", 0);
@@ -388,7 +395,7 @@ public class PrestoWriteSupport
     }
 
     private class RowWriter
-            implements ColumnWriter
+            implements ColumnWriter<List<Object>>
     {
         private final List<ColumnWriter> columnWriters;
         private final RowType rowType;
@@ -402,13 +409,12 @@ public class PrestoWriteSupport
         @Override
         public void write(Block block, int rownum)
         {
-            write(rowType.getObjectValue(session, block, rownum));
+            write((List<Object>) rowType.getObjectValue(session, block, rownum));
         }
 
         @Override
-        public void write(Object obj)
+        public void write(List<Object> fields)
         {
-            List<Object> fields = (List<Object>) obj;
             recordConsumer.startGroup();
             for (int i = 0; i < fields.size(); i++) {
                 final String name = rowType.getFields().get(i).getName().orElseThrow(() -> new IllegalArgumentException("parquet requires row type fields to have names"));
@@ -418,20 +424,6 @@ public class PrestoWriteSupport
             }
             recordConsumer.endGroup();
         }
-    }
-
-    private void consumeGroup(ColumnWriter writer, Block block, int rowNum)
-    {
-        recordConsumer.startGroup();
-        writer.write(block, rowNum);
-        recordConsumer.endGroup();
-    }
-
-    private void consumeGroup(ColumnWriter writer, Object value)
-    {
-        recordConsumer.startGroup();
-        writer.write(value);
-        recordConsumer.endGroup();
     }
 
     private void consumeField(String fieldName, int index, ColumnWriter writer, Block block, int rowNum)
@@ -448,19 +440,19 @@ public class PrestoWriteSupport
         recordConsumer.endField(fieldName, index);
     }
 
-    private Map<Type, ColumnWriter> writerMap = new HashMap()
+    private final Map<Type, ColumnWriter> writerMap = new HashMap()
     {{
-            put(com.netflix.iceberg.types.Type.TypeID.BOOLEAN, new BooleanWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.LONG, new LongWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.FLOAT, new FloatWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.DOUBLE, new DoubleWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.INTEGER, new IntWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.DATE, new DateWriter());
+            put(BOOLEAN, new BooleanWriter());
+            put(LONG, new LongWriter());
+            put(FLOAT, new FloatWriter());
+            put(DOUBLE, new DoubleWriter());
+            put(INTEGER, new IntWriter());
+            put(DATE, new DateWriter());
             //TODO put(com.netflix.iceberg.types.Type.TypeID.TIME, new TimeWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.STRING, new StringWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.UUID, new StringWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.FIXED, new BinaryWriter());
-            put(com.netflix.iceberg.types.Type.TypeID.BINARY, new BinaryWriter());
+            put(STRING, new StringWriter());
+            put(UUID, new StringWriter());
+            put(FIXED, new BinaryWriter());
+            put(BINARY, new BinaryWriter());
         }};
 
     private final ColumnWriter getWriter(Type type)
