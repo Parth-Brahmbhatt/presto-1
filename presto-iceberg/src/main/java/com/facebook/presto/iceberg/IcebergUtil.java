@@ -18,6 +18,9 @@ import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.hive.HiveTypeTranslator;
 import com.facebook.presto.hive.TypeTranslator;
 import com.facebook.presto.iceberg.type.TypeConveter;
+import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
@@ -26,6 +29,8 @@ import com.netflix.iceberg.PartitionField;
 import com.netflix.iceberg.PartitionSpec;
 import com.netflix.iceberg.Schema;
 import com.netflix.iceberg.Table;
+import com.netflix.iceberg.TableScan;
+import com.netflix.iceberg.expressions.Expression;
 import com.netflix.iceberg.hive.HiveTables;
 import com.netflix.iceberg.types.Type;
 import com.netflix.iceberg.types.Types;
@@ -137,5 +142,47 @@ class IcebergUtil
         return FileFormat.valueOf(table.properties()
                 .getOrDefault(DEFAULT_FILE_FORMAT, DEFAULT_FILE_FORMAT_DEFAULT)
                 .toUpperCase(Locale.ENGLISH));
+    }
+
+    public final TableScan getTableScan(ConnectorSession session, TupleDomain<HiveColumnHandle> predicates, Long snapshotId, Long snapshotTimestamp, Table icebergTable)
+    {
+        if (snapshotId != null && snapshotTimestamp != null) {
+            throw new IllegalArgumentException(String.format("Either specify a predicate on %s or %s but not both", SNAPSHOT_ID, SNAPSHOT_TIMESTAMP_MS));
+        }
+
+        final Expression expression = ExpressionConverter.toIceberg(predicates, session);
+        TableScan tableScan = icebergTable.newScan().filter(expression);
+
+        if (snapshotId != null) {
+            tableScan = tableScan.useSnapshot(snapshotId);
+        }
+        else if (snapshotTimestamp != null) {
+            tableScan = tableScan.asOfTime(snapshotTimestamp);
+        }
+        return tableScan;
+    }
+
+    public final Long getPredicateValue(TupleDomain<HiveColumnHandle> predicates, String columnName)
+    {
+        if (predicates.isNone() || predicates.isAll()) {
+            return null;
+        }
+
+        return predicates.getDomains().map(hiveColumnHandleDomainMap -> {
+            final List<Domain> snapShotDomains = hiveColumnHandleDomainMap.entrySet().stream()
+                    .filter(hiveColumnHandleDomainEntry -> hiveColumnHandleDomainEntry.getKey().getName().equals(columnName))
+                    .map(hiveColumnHandleDomainEntry -> hiveColumnHandleDomainEntry.getValue())
+                    .collect(Collectors.toList());
+
+            if (snapShotDomains.isEmpty()) {
+                return null;
+            }
+
+            if (snapShotDomains.size() > 1 || !snapShotDomains.get(0).isSingleValue()) {
+                throw new IllegalArgumentException(String.format("Only %s = value check is allowed on column = %s", columnName, columnName));
+            }
+
+            return (Long) snapShotDomains.get(0).getSingleValue();
+        }).orElse(null);
     }
 }
