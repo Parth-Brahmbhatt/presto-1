@@ -88,7 +88,8 @@ public class IcebergPageSink
     private final ConnectorSession session;
     private final TypeManager typeManager;
     private final FileFormat fileFormat;
-    final List<Type> partitionTypes;
+    private final List<Type> partitionTypes;
+    private final List<Boolean> isNullable;
     private static final TypeToMessageType typeToMessageType = new TypeToMessageType();
 
     public IcebergPageSink(Schema outputSchema,
@@ -116,6 +117,7 @@ public class IcebergPageSink
         this.partitionToPartitionData = new HashMap<>();
         this.partitionTypes = partitionColumns.stream().map(col -> typeManager.getType(col.getTypeSignature())).collect(toList());
         this.inputColumns = inputColumns;
+        this.isNullable = outputSchema.columns().stream().map(column -> column.isOptional()).collect(toList());
     }
 
     @Override
@@ -196,7 +198,7 @@ public class IcebergPageSink
                             .set("spark.sql.parquet.int96AsTimestamp", "false")
                             .set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
                             .schema(outputSchema)
-                            .writeSupport(new PrestoWriteSupport(inputColumns, typeToMessageType.convert(outputSchema, "presto_schema"), outputSchema, typeManager, session))
+                            .writeSupport(new PrestoWriteSupport(inputColumns, typeToMessageType.convert(outputSchema, "presto_schema"), outputSchema, typeManager, session, isNullable))
                             .build();
                     partitionToFile.put(partitionPath, outputFile.location());
                     return writer;

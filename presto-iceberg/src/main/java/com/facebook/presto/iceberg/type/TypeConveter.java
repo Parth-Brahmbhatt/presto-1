@@ -171,11 +171,11 @@ public class TypeConveter
 
     private static com.netflix.iceberg.types.Type handle(ArrayType type)
     {
-        return Types.ListType.ofRequired(1, convert(type.getElementType()));
+        return Types.ListType.ofOptional(1, convert(type.getElementType()));
     }
 
     private static com.netflix.iceberg.types.Type handle(MapType type)
     {
-        return Types.MapType.ofRequired(1, 2, convert(type.getKeyType()), convert(type.getValueType()));
+        return Types.MapType.ofOptional(1, 2, convert(type.getKeyType()), convert(type.getValueType()));
     }
 }

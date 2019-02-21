@@ -14,9 +14,11 @@
 package com.facebook.presto.iceberg.parquet.writer;
 
 import com.facebook.presto.hive.HiveColumnHandle;
+import com.facebook.presto.hive.HiveErrorCode;
 import com.facebook.presto.iceberg.type.TypeConveter;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.ArrayType;
 import com.facebook.presto.spi.type.BigintType;
@@ -75,10 +77,11 @@ public class PrestoWriteSupport
     private final ConnectorSession session;
     private final Schema icebergSchema;
     private final List<ColumnWriter> writers;
+    private final List<Boolean> isNullable;
 
     private RecordConsumer recordConsumer;
 
-    public PrestoWriteSupport(List<HiveColumnHandle> columns, MessageType schema, Schema icebergSchema, TypeManager typeManager, ConnectorSession session)
+    public PrestoWriteSupport(List<HiveColumnHandle> columns, MessageType schema, Schema icebergSchema, TypeManager typeManager, ConnectorSession session, List<Boolean> isNullable)
     {
         this.columns = columns;
         this.schema = schema;
@@ -86,6 +89,7 @@ public class PrestoWriteSupport
         this.session = session;
         this.icebergSchema = icebergSchema;
         this.writers = getPrestoType(columns).stream().map(t -> getWriter(t)).collect(toList());
+        this.isNullable = isNullable;
     }
 
     @Override
@@ -110,6 +114,9 @@ public class PrestoWriteSupport
                 final Block block = page.getBlock(columnIndex);
                 if (!block.isNull(rowNum)) {
                     consumeField(columns.get(columnIndex).getName(), columnIndex, writers.get(columnIndex), block, rowNum);
+                }
+                else if (!isNullable.get(columnIndex)) {
+                    throw new PrestoException(HiveErrorCode.HIVE_BAD_DATA, String.format("%s column can not be null", columns.get(columnIndex).getName()));
                 }
             }
             recordConsumer.endMessage();

@@ -89,7 +89,7 @@ import static com.facebook.presto.hive.HiveUtil.schemaTableName;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.netflix.iceberg.types.Types.NestedField.required;
+import static com.netflix.iceberg.types.Types.NestedField.optional;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -552,7 +552,7 @@ public class IcebergMetadata
                 final String name = column.getName();
                 final Type type = column.getType();
                 final com.netflix.iceberg.types.Type icebergType = TypeConveter.convert(type);
-                icebergColumns.add(required(icebergColumns.size(), name, icebergType));
+                icebergColumns.add(optional(icebergColumns.size(), name, icebergType));
             }
         }
         return icebergColumns;
