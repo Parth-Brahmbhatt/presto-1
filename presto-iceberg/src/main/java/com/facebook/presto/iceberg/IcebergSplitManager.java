@@ -22,18 +22,15 @@ import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.connector.classloader.ClassLoaderSafeConnectorSplitSource;
-import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.TypeManager;
 import com.netflix.iceberg.Table;
 import com.netflix.iceberg.TableScan;
-import com.netflix.iceberg.expressions.Expression;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -67,29 +64,23 @@ public class IcebergSplitManager
             ConnectorTableLayoutHandle layout,
             SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        final IcebergTableLayoutHandle tbl = (IcebergTableLayoutHandle) layout;
-        final TupleDomain<HiveColumnHandle> predicates = tbl.getPredicates().getDomains()
+        IcebergTableLayoutHandle tbl = (IcebergTableLayoutHandle) layout;
+        TupleDomain<HiveColumnHandle> predicates = tbl.getPredicates().getDomains()
                 .map(m -> m.entrySet().stream().collect(Collectors.toMap((x) -> HiveColumnHandle.class.cast(x.getKey()), Map.Entry::getValue)))
                 .map(m -> TupleDomain.withColumnDomains(m)).orElse(TupleDomain.none());
-        final Configuration configuration = hdfsEnvironment.getConfiguration(new HdfsEnvironment.HdfsContext(session, tbl.getDatabase()), new Path("file:///tmp"));
-        final Table icebergTable = icebergUtil.getIcebergTable(tbl.getDatabase(), tbl.getTableName(), configuration);
-        final Long snapshotId = getPredicateValue(predicates, SNAPSHOT_ID);
-        final Long snapshotTimestamp = getPredicateValue(predicates, SNAPSHOT_TIMESTAMP_MS);
-        final Expression expression = ExpressionConverter.toIceberg(predicates, session);
-        TableScan tableScan = icebergTable.newScan().filter(expression);
 
-        if (snapshotId != null && snapshotTimestamp != null) {
-            throw new IllegalArgumentException(String.format("Either specify a predicate on %s or %s but not both", SNAPSHOT_ID, SNAPSHOT_TIMESTAMP_MS));
-        }
+        Configuration configuration = hdfsEnvironment.getConfiguration(new HdfsEnvironment.HdfsContext(session, tbl.getDatabase()), new Path("file:///tmp"));
+        Table icebergTable = icebergUtil.getIcebergTable(tbl.getDatabase(), tbl.getTableName(), configuration);
+        Long snapshotId = icebergUtil.getPredicateValue(predicates, SNAPSHOT_ID);
+        Long snapshotTimestamp = icebergUtil.getPredicateValue(predicates, SNAPSHOT_TIMESTAMP_MS);
+        TableScan tableScan = icebergUtil.getTableScan(session, predicates, snapshotId, snapshotTimestamp, icebergTable);
 
-        if (snapshotId != null) {
-            tableScan = tableScan.useSnapshot(snapshotId);
-        }
-        else if (snapshotTimestamp != null) {
-            tableScan = tableScan.asOfTime(snapshotTimestamp);
-        }
+        // We set these values to current snapshotId to ensure if user projects these columns they get the actual values and not null when these columns are not specified
+        // in predicates.
+        snapshotId = snapshotId != null ? snapshotId : icebergTable.currentSnapshot().snapshotId();
+        snapshotTimestamp = snapshotTimestamp != null ? snapshotTimestamp : icebergTable.currentSnapshot().timestampMillis();
 
-        // TODO Use residual Right now there is no way to propagate residual to presto but at least we can
+        // TODO Use residual. Right now there is no way to propagate residual to presto but at least we can
         // propagate it at split level so the parquet pushdown can leverage it.
         final IcebergSplitSource icebergSplitSource = new IcebergSplitSource(
                 tbl.getDatabase(),
@@ -105,29 +96,5 @@ public class IcebergSplitManager
                 snapshotId,
                 snapshotTimestamp);
         return new ClassLoaderSafeConnectorSplitSource(icebergSplitSource, Thread.currentThread().getContextClassLoader());
-    }
-
-    private Long getPredicateValue(TupleDomain<HiveColumnHandle> predicates, String columnName)
-    {
-        if (predicates.isNone() || predicates.isAll()) {
-            return null;
-        }
-
-        return predicates.getDomains().map(hiveColumnHandleDomainMap -> {
-            final List<Domain> snapShotDomains = hiveColumnHandleDomainMap.entrySet().stream()
-                    .filter(hiveColumnHandleDomainEntry -> hiveColumnHandleDomainEntry.getKey().getName().equals(columnName))
-                    .map(hiveColumnHandleDomainEntry -> hiveColumnHandleDomainEntry.getValue())
-                    .collect(Collectors.toList());
-
-            if (snapShotDomains.isEmpty()) {
-                return null;
-            }
-
-            if (snapShotDomains.size() > 1 || !snapShotDomains.get(0).isSingleValue()) {
-                throw new IllegalArgumentException(String.format("Only %s = value check is allowed on column = %s", columnName, columnName));
-            }
-
-            return (Long) snapShotDomains.get(0).getSingleValue();
-        }).orElse(null);
     }
 }
