@@ -228,8 +228,11 @@ public class IcebergMetadata
 
                     // We set these values to current snapshotId to ensure if user projects these columns they get the actual values and not null when these columns are not specified
                     // in predicates.
-                    snapshotId = snapshotId != null ? snapshotId : icebergTable.currentSnapshot().snapshotId();
-                    snapshotTimestamp = snapshotTimestamp != null ? snapshotTimestamp : icebergTable.currentSnapshot().timestampMillis();
+                    Long currentSnapshotId = icebergTable.currentSnapshot() != null ? icebergTable.currentSnapshot().snapshotId() : null;
+                    Long currentSnapshotTimestamp = icebergTable.currentSnapshot() != null ? icebergTable.currentSnapshot().timestampMillis() : null;
+
+                    snapshotId = snapshotId != null ? snapshotId : currentSnapshotId;
+                    snapshotTimestamp = snapshotTimestamp != null ? snapshotTimestamp : currentSnapshotTimestamp;
 
                     final Map<String, ScanSummary.PartitionMetrics> partitionToMetrics = ScanSummary.of(tableScan).build();
                     final ImmutableList.Builder<List<Object>> records = new ImmutableList.Builder();
