@@ -198,7 +198,7 @@ public class IcebergPageSourceProvider
 
             final ImmutableList.Builder<ColumnMapping> mappingBuilder = new ImmutableList.Builder<>();
             mappingBuilder.addAll(buildColumnMappings(partitionKeys,
-                    columns,
+                    columns.stream().filter(columnHandle -> !columnHandle.isHidden()).collect(toList()),
                     Collections.EMPTY_LIST,
                     Collections.emptyMap(),
                     path,
