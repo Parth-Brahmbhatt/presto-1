@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.212</version>
+        <version>306-SNAPSHOT</version>
     </parent>
 
 
@@ -25,9 +25,6 @@
     <properties>
         <parquet.version>1.10.0</parquet.version>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <!--<air.check.skip-dependency>true</air.check.skip-dependency>-->
-        <!--<air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>-->
-        <!--<air.check.skip-checkstyle>true</air.check.skip-checkstyle>-->
     </properties>
 
     <dependencies>
@@ -176,6 +173,11 @@
             <artifactId>presto-memory-context</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.4</version>
+        </dependency>
         <!--<dependency>-->
             <!--<groupId>it.unimi.dsi</groupId>-->
             <!--<artifactId>fastutil</artifactId>-->
