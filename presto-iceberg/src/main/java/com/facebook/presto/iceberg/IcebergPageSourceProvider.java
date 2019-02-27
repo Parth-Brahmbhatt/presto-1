@@ -60,7 +60,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
@@ -243,8 +242,9 @@ public class IcebergPageSourceProvider
 
     /**
      * This method maps the iceberg column names to corresponding parquet column names by matching their Ids rather then relying on name or index.
-     * If the parquet schema has at least one field with no Id then the method assumes this is a case of a migrated hive table and it will return the original column name as is.
-     * If all the parquet schema fields have the Id but the iceberg schema ids do not match any column the method throws an exception indicating data issue.
+     * If no parquet fields have an id, this is a case of migrated table and the method just returns the same column name as the hive column name.
+     * If any parquet field has an Id, it returns a column name that has the same icebergId. If no icebergId matches the given parquetId, it assumes
+     * the column must have been added to table later and does not return any column name for that column.
      * @param columns iceberg columns
      * @param icebergNameToId
      * @param parquetSchema
@@ -252,32 +252,30 @@ public class IcebergPageSourceProvider
      */
     private List<HiveColumnHandle> convertToParquetNames(List<HiveColumnHandle> columns, Map<String, Integer> icebergNameToId, MessageType parquetSchema)
     {
-        // TODO do it at top level rather than repeating this work per split.
         final List<org.apache.parquet.schema.Type> fields = parquetSchema.getFields();
         final List<HiveColumnHandle> result = new ArrayList<>();
-        Map<Integer, String> icebergIdToName = icebergNameToId.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
-        Map<String, HiveColumnHandle> columnNameToColumnHandle = columns.stream()
-                .collect(Collectors.toMap(HiveColumnHandle::getName, Function.identity()));
+        final Map<Integer, String> parquetIdToName = fields.stream()
+                .filter(field -> field.getId() != null)
+                .collect(Collectors.toMap((x) -> x.getId().intValue(), Type::getName));
 
-        for (int index = 0; index < fields.size(); index++) {
-            final Type field = fields.get(index);
-            if (field.getId() != null) {
-                final String parquetName = field.getName();
-                final String icebergColumnName = icebergIdToName.get(field.getId().intValue());
-                if (icebergColumnName == null) {
-                    // the column is present in parquet but dropped from iceberg schema, so ignoring the column.
-                    continue;
-                }
-                else {
-                    final HiveColumnHandle column = columnNameToColumnHandle.get(icebergColumnName);
+        for (HiveColumnHandle column : columns) {
+            if (!column.isHidden()) {
+                final String name = column.getName();
+                final Integer id = icebergNameToId.get(name);
+                if (parquetIdToName.containsKey(id)) {
+                    String parquetName = parquetIdToName.get(id);
                     result.add(new HiveColumnHandle(parquetName, column.getHiveType(), column.getTypeSignature(), column.getHiveColumnIndex(), column.getColumnType(), column.getComment()));
                 }
-            }
-            else {
-                // the column id is null, so this is a case of migrated table, we will make the assumption that no
-                // columns were dropped so we will just return the column at same index.
-                result.add(columns.get(index));
+                else {
+                    if (parquetIdToName.isEmpty()) {
+                        // a case of migrated tables so we just add the column as is.
+                        result.add(column);
+                    }
+                    else {
+                        // this is not a migrated table but not parquet id matches. This could mean the column was added after this parquet file was created
+                        // so we should ignore this column
+                    }
+                }
             }
         }
         return result;
