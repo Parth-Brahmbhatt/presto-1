@@ -30,6 +30,7 @@ public class NetflixPlugin
         return ImmutableSet.<Class<?>>builder()
                 .add(NetflixFunctions.class)
                 .add(NetflixDateFunctions.class)
+                .add(NetflixClFunctions.class)
                 .build();
     }
 
