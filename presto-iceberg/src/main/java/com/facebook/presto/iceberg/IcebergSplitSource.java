@@ -141,16 +141,17 @@ public class IcebergSplitSource
     {
         final StructLike partition = scanTask.file().partition();
         final PartitionSpec spec = scanTask.spec();
-        final List<PartitionField> fields = getIdentityPartitions(spec);
+        final Map<PartitionField, Integer> fieldToIndex = getIdentityPartitions(spec);
         List<HivePartitionKey> partitionKeys = new ArrayList<>();
 
-        for (int i = 0; i < fields.size(); i++) {
-            PartitionField field = fields.get(i);
+        for (Map.Entry<PartitionField, Integer> entry : fieldToIndex.entrySet()) {
+            PartitionField field = entry.getKey();
+            Integer index = entry.getValue();
             final String name = field.name();
             Type sourceType = spec.schema().findType(field.sourceId());
             final Type partitionType = field.transform().getResultType(sourceType);
             final Class<?> javaClass = partitionType.typeId().javaClass();
-            Object value = partition.get(i, javaClass);
+            Object value = partition.get(index, javaClass);
             String partitionValue = HIVE_DEFAULT_DYNAMIC_PARTITION;
             if (value != null) {
                 switch (partitionType.typeId()) {

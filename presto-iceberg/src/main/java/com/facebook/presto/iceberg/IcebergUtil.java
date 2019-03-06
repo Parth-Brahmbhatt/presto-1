@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static com.facebook.presto.hive.HiveColumnHandle.ColumnType.REGULAR;
@@ -52,6 +53,7 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.netflix.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static com.netflix.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
+import static java.util.stream.Collectors.toMap;
 
 class IcebergUtil
 {
@@ -90,8 +92,8 @@ class IcebergUtil
         final List<Types.NestedField> columns = schema.columns();
         int columnIndex = 0;
         ImmutableList.Builder builder = ImmutableList.builder();
-        final List<PartitionField> partitionFields = getIdentityPartitions(spec);
-        final Map<String, PartitionField> partitionColumnNames = partitionFields.stream().collect(Collectors.toMap(PartitionField::name, Function.identity()));
+        final List<PartitionField> partitionFields = getIdentityPartitions(spec).entrySet().stream().map(e -> e.getKey()).collect(Collectors.toList());
+        final Map<String, PartitionField> partitionColumnNames = partitionFields.stream().collect(toMap(PartitionField::name, Function.identity()));
         // Iceberg may or may not store identity columns in data file and the identity transformations have the same name as data column.
         // So we remove the identity columns from the set of regular columns which does not work with some of presto validation.
 
@@ -124,12 +126,18 @@ class IcebergUtil
         return prestoType;
     }
 
-    public List<PartitionField> getIdentityPartitions(PartitionSpec partitionSpec)
+    public static final Map<PartitionField, Integer> getIdentityPartitions(PartitionSpec partitionSpec)
     {
         //TODO We are only treating identity column as partition columns as we do not want all other columns to be projectable or filterable.
         // Identity class is not public so no way to really identify if a transformation is identity transformation or not other than checking toString as of now.
         // Need to make changes to iceberg so we can identify transform in a better way.
-        return partitionSpec.fields().stream().filter(partitionField -> partitionField.transform().toString().equals("identity")).collect(Collectors.toList());
+        return IntStream.range(0, partitionSpec.fields().size())
+                .boxed()
+                .collect(toMap(partitionSpec.fields()::get, i -> i))
+                .entrySet()
+                .stream()
+                .filter(e -> e.getKey().transform().toString().equals("identity"))
+                .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     public String getDataPath(String icebergLocation)
