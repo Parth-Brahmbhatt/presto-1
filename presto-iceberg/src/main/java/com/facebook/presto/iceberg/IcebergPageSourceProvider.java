@@ -37,6 +37,7 @@ import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -164,8 +165,9 @@ public class IcebergPageSourceProvider
             // use that here to map from iceberg schema column name to ID, lookup parquet column with same ID and all of its children
             // and use the index of all those columns as requested schema.
 
-            final List<HiveColumnHandle> parquetColumns = convertToParquetNames(columns, icebergNameToId, fileSchema);
-            List<org.apache.parquet.schema.Type> fields = parquetColumns.stream()
+            final Map<String, HiveColumnHandle> parquetColumns = convertToParquetNames(columns, icebergNameToId, fileSchema);
+
+            List<org.apache.parquet.schema.Type> fields = parquetColumns.values().stream()
                     .filter(column -> column.getColumnType() == REGULAR)
                     .map(column -> getParquetType(column, fileSchema, true)) // we always use parquet column names in case of iceberg.
                     .filter(Objects::nonNull)
@@ -206,6 +208,15 @@ public class IcebergPageSourceProvider
             setIfPresent(mappingBuilder, getColumnHandle(SNAPSHOT_ID, columns), String.valueOf(snapshotId));
             setIfPresent(mappingBuilder, getColumnHandle(SNAPSHOT_TIMESTAMP_MS, columns), String.valueOf(snapshotTimeStamp));
 
+            // This transformation is solely done so columns that are renames can be read. ParquetPageSource tries to get
+            // column type from column name and because the name in parquet file is different than the iceberg column name
+            // it gets a null back. When it can't find a field it assumes that field is missing and just assigns a null block
+            // for the whole field.
+            final List<HiveColumnHandle> columnNameReplaced = columns.stream()
+                    .filter(c -> c.getColumnType() == REGULAR)
+                    .map(c -> parquetColumns.containsKey(c.getName()) ? parquetColumns.get(c.getName()) : c)
+                    .collect(toList());
+
             return new HivePageSource(
                     mappingBuilder.build(),
                     Optional.empty(),
@@ -217,7 +228,7 @@ public class IcebergPageSourceProvider
                             messageColumnIO,
                             typeManager,
                             new Properties(),
-                            columns.stream().filter(c -> c.getColumnType() == REGULAR).collect(toList()),
+                            columnNameReplaced,
                             effectivePredicate,
                             useParquetColumnNames));
         }
@@ -248,12 +259,12 @@ public class IcebergPageSourceProvider
      * @param columns iceberg columns
      * @param icebergNameToId
      * @param parquetSchema
-     * @return columns with iceberg column names replaced with parquet column names.
+     * @return Map from iceberg column names to column handles with replace column names.
      */
-    private List<HiveColumnHandle> convertToParquetNames(List<HiveColumnHandle> columns, Map<String, Integer> icebergNameToId, MessageType parquetSchema)
+    private Map<String, HiveColumnHandle> convertToParquetNames(List<HiveColumnHandle> columns, Map<String, Integer> icebergNameToId, MessageType parquetSchema)
     {
         final List<org.apache.parquet.schema.Type> fields = parquetSchema.getFields();
-        final List<HiveColumnHandle> result = new ArrayList<>();
+        final ImmutableMap.Builder<String, HiveColumnHandle> builder = ImmutableMap.builder();
         final Map<Integer, String> parquetIdToName = fields.stream()
                 .filter(field -> field.getId() != null)
                 .collect(Collectors.toMap((x) -> x.getId().intValue(), Type::getName));
@@ -264,12 +275,13 @@ public class IcebergPageSourceProvider
                 final Integer id = icebergNameToId.get(name);
                 if (parquetIdToName.containsKey(id)) {
                     String parquetName = parquetIdToName.get(id);
-                    result.add(new HiveColumnHandle(parquetName, column.getHiveType(), column.getTypeSignature(), column.getHiveColumnIndex(), column.getColumnType(), column.getComment()));
+                    final HiveColumnHandle columnHandle = new HiveColumnHandle(parquetName, column.getHiveType(), column.getTypeSignature(), column.getHiveColumnIndex(), column.getColumnType(), column.getComment());
+                    builder.put(name, columnHandle);
                 }
                 else {
                     if (parquetIdToName.isEmpty()) {
                         // a case of migrated tables so we just add the column as is.
-                        result.add(column);
+                        builder.put(name, column);
                     }
                     else {
                         // this is not a migrated table but not parquet id matches. This could mean the column was added after this parquet file was created
@@ -278,7 +290,7 @@ public class IcebergPageSourceProvider
                 }
             }
         }
-        return result;
+        return builder.build();
     }
 
     private final Optional<HiveColumnHandle> getColumnHandle(String columnName, List<HiveColumnHandle> columns)
