@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.facebook.presto</groupId>
+        <groupId>io.prestosql</groupId>
         <artifactId>presto-root</artifactId>
         <version>306-SNAPSHOT</version>
     </parent>
@@ -23,32 +23,29 @@
     </repositories>
 
     <properties>
-        <parquet.version>1.10.0</parquet.version>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+        <air.check.skip-checkstyle>true</air.check.skip-checkstyle>
     </properties>
 
     <dependencies>
-
-        <dependency>
-            <groupId>com.facebook.presto.hadoop</groupId>
-            <artifactId>hadoop-apache2</artifactId>
-            <!--<scope>runtime</scope>-->
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
         <dependency>
             <groupId>com.netflix.iceberg</groupId>
             <artifactId>iceberg-presto-runtime</artifactId>
-            <version>0.5.0-30-gf240a7a.dirty</version>
+            <version>0.5.0-59-gbb1ad420.dirty</version>
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.presto</groupId>
+            <groupId>io.prestosql.hadoop</groupId>
+            <artifactId>hadoop-apache</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.prestosql.hive</groupId>
+            <artifactId>hive-apache</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.prestosql</groupId>
             <artifactId>presto-hive</artifactId>
             <exclusions>
                 <exclusion>
@@ -56,27 +53,15 @@
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>com.facebook.presto</groupId>
+                    <groupId>io.prestosql</groupId>
                     <artifactId>presto-parquet</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.presto</groupId>
+            <groupId>io.prestosql</groupId>
             <artifactId>presto-parquet</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId> org.apache.parquet</groupId>
-            <artifactId>parquet-column</artifactId>
-            <version>${parquet.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId> org.apache.parquet</groupId>
-            <artifactId>parquet-hadoop</artifactId>
-            <version>${parquet.version}</version>
         </dependency>
 
         <dependency>
@@ -132,7 +117,7 @@
 
         <!-- Presto SPI -->
         <dependency>
-            <groupId>com.facebook.presto</groupId>
+            <groupId>io.prestosql</groupId>
             <artifactId>presto-spi</artifactId>
             <scope>provided</scope>
         </dependency>
@@ -169,15 +154,15 @@
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.presto</groupId>
+            <groupId>io.prestosql</groupId>
             <artifactId>presto-memory-context</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.4</version>
-        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>commons-io</groupId>-->
+            <!--<artifactId>commons-io</artifactId>-->
+            <!--<version>2.4</version>-->
+        <!--</dependency>-->
         <!--<dependency>-->
             <!--<groupId>it.unimi.dsi</groupId>-->
             <!--<artifactId>fastutil</artifactId>-->
@@ -198,22 +183,22 @@
 
         <!-- test scope -->
         <!--<dependency>-->
-            <!--<groupId>com.facebook.presto</groupId>-->
+            <!--<groupId>io.prestosql</groupId>-->
             <!--<artifactId>presto-main</artifactId>-->
             <!--<scope>test</scope>-->
         <!--</dependency>-->
 
         <!--<dependency>-->
-            <!--<groupId>com.facebook.presto</groupId>-->
+            <!--<groupId>io.prestosql</groupId>-->
             <!--<artifactId>presto-tests</artifactId>-->
             <!--<scope>test</scope>-->
         <!--</dependency>-->
 
-        <!--<dependency>-->
-            <!--<groupId>org.testng</groupId>-->
-            <!--<artifactId>testng</artifactId>-->
-            <!--<scope>test</scope>-->
-        <!--</dependency>-->
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!--<dependency>-->
             <!--<groupId>io.airlift</groupId>-->
@@ -285,7 +270,7 @@
                                 <configuration>
                                     <filters>
                                         <filter>
-                                            <artifact>com.facebook.presto.hive:hive-apache</artifact>
+                                            <artifact>io.prestosql.hive:hive-apache</artifact>
                                             <excludes>
                                                 <exclude>parquet/**</exclude>
                                             </excludes>

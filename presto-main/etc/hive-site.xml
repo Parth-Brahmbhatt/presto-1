@@ -13,4 +13,8 @@
     <name>hive.metastore.warehouse.dir</name>
     <value>file:///tmp/</value>
   </property>
+  <property>
+    <name>hive.metastore.disallow.incompatible.col.type.changes</name>
+    <value>false</value>
+  </property>
 </configuration>
