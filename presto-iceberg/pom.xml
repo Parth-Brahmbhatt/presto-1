@@ -29,9 +29,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.netflix.iceberg</groupId>
+            <groupId>com.github.Parth-Brahmbhatt.incubator-iceberg</groupId>
             <artifactId>iceberg-presto-runtime</artifactId>
-            <version>0.5.0-59-gbb1ad420.dirty</version>
+            <version>presto-sql-150d58ade7-1</version>
         </dependency>
 
         <dependency>
