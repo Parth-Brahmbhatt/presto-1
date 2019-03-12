@@ -44,3 +44,28 @@ create table iceberg.testdb.sample_partitioned (
  )
 WITH (partitioned_by = ARRAY['dateint', 's']);
 ```
+
+## Insert and Select
+There is no uniqueness in these cases just select and insert like you would to any hive table. The big difference is you should be able
+to add,drop and rename columns without any issues.
+
+## Migrating existing tables
+This plugin can read/write to hive tables that have been migrated to iceberg. Currently there is no presto support to migrate hive
+tables to presto so you will either need to use icerberg API or use spark.
+
+## Hidden columns
+Iceberg supports $snapshot_id and $snapshot_timestamp_ms as hidden columns. These columns allows users to query an old version of
+the table. In addition it also supports $partitions for hive compatibility.
+
+## Still to do
+Support for delete from.
+Support for hidden partitioning.
+Support for time type.
+Bucketing support.
+Iceberg table properties.
+Create table like support.
+Support for column level comments.
+Remove dependency on presto-hive plugin , extract the metastore classes and security module out.
+Explore if we can support/extend presto sql dialect so users can have "migrate table", "rollback table to snapshot" equivalents in presto.
+
+
