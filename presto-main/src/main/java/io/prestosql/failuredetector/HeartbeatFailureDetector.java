@@ -17,20 +17,21 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import io.airlift.concurrent.ThreadPoolExecutorMBean;
 import io.airlift.discovery.client.ServiceDescriptor;
 import io.airlift.discovery.client.ServiceSelector;
 import io.airlift.discovery.client.ServiceType;
+import io.airlift.http.client.FullJsonResponseHandler;
 import io.airlift.http.client.HttpClient;
-import io.airlift.http.client.Request;
-import io.airlift.http.client.Response;
-import io.airlift.http.client.ResponseHandler;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
 import io.airlift.stats.DecayCounter;
 import io.airlift.stats.ExponentialDecay;
 import io.airlift.units.Duration;
 import io.prestosql.client.FailureInfo;
+import io.prestosql.metadata.NodeState;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.util.Failures;
@@ -52,6 +53,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,15 +67,22 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.net.MediaType.JSON_UTF_8;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.Request.Builder.prepareHead;
+import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
+import static io.airlift.http.client.Request.Builder.prepareGet;
+import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.prestosql.failuredetector.FailureDetector.State.ALIVE;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.failuredetector.FailureDetector.State.UNKNOWN;
 import static io.prestosql.failuredetector.FailureDetector.State.UNRESPONSIVE;
+import static io.prestosql.metadata.NodeState.SHUTTING_DOWN;
 import static io.prestosql.spi.HostAddress.fromUri;
 import static java.util.Objects.requireNonNull;
+import static javax.ws.rs.core.HttpHeaders.CONTENT_TYPE;
 
 public class HeartbeatFailureDetector
         implements FailureDetector
@@ -208,13 +217,19 @@ public class HeartbeatFailureDetector
         return tasks.size() - getFailed().size();
     }
 
-    public Map<ServiceDescriptor, Stats> getStats()
+    public Set<Stats> getStats()
     {
-        ImmutableMap.Builder<ServiceDescriptor, Stats> builder = ImmutableMap.builder();
-        for (MonitoringTask task : tasks.values()) {
-            builder.put(task.getService(), task.getStats());
-        }
-        return builder.build();
+        return tasks.values().stream()
+                .map(MonitoringTask::getStats)
+                .collect(toImmutableSet());
+    }
+
+    public Set<Stats> getStatsWithFilters(boolean isFailed, boolean isDecommissioned)
+    {
+        return tasks.values().stream()
+                .filter(task -> (task.isFailed() == isFailed && task.isDecommissioned == isDecommissioned))
+                .map(MonitoringTask::getStats)
+                .collect(toImmutableSet());
     }
 
     @VisibleForTesting
@@ -291,11 +306,19 @@ public class HeartbeatFailureDetector
         private Long disabledTimestamp;
 
         @GuardedBy("this")
+        private boolean isShuttingDown;
+
+        @GuardedBy("this")
+        private boolean isDecommissioned;
+
+        @GuardedBy("this")
         private Long successTransitionTimestamp;
+
+        private AtomicReference<Optional<NodeState>> nodeState = new AtomicReference<>(Optional.empty());
 
         private MonitoringTask(ServiceDescriptor service, URI uri)
         {
-            this.uri = uri;
+            this.uri = uri.resolve("/v1/info/state");
             this.service = service;
             this.stats = new Stats(uri);
         }
@@ -334,6 +357,10 @@ public class HeartbeatFailureDetector
                 future = null;
                 disabledTimestamp = System.nanoTime();
             }
+            if (!isDecommissioned && isShuttingDown) {
+                isDecommissioned = true;
+                isShuttingDown = false;
+            }
         }
 
         public synchronized boolean isExpired()
@@ -352,26 +379,34 @@ public class HeartbeatFailureDetector
         {
             try {
                 stats.recordStart();
-                httpClient.executeAsync(prepareHead().setUri(uri).build(), new ResponseHandler<Object, Exception>()
+                HttpClient.HttpResponseFuture<FullJsonResponseHandler.JsonResponse<NodeState>> responseFuture = httpClient.executeAsync(prepareGet()
+                        .setUri(uri)
+                        .setHeader(CONTENT_TYPE, JSON_UTF_8.toString())
+                        .build(), createFullJsonResponseHandler(jsonCodec(NodeState.class)));
+                Futures.addCallback(responseFuture, new FutureCallback<FullJsonResponseHandler.JsonResponse<NodeState>>()
+
                 {
                     @Override
-                    public Exception handleException(Request request, Exception exception)
+                    public void onSuccess(@Nullable FullJsonResponseHandler.JsonResponse<NodeState> result)
                     {
-                        // ignore error
-                        stats.recordFailure(exception);
-
-                        // TODO: this will technically cause an NPE in httpClient, but it's not triggered because
-                        // we never call get() on the response future. This behavior needs to be fixed in airlift
-                        return null;
+                        if (result != null) {
+                            if (result.hasValue()) {
+                                NodeState remoteNodeState = result.getValue();
+                                if (remoteNodeState.equals(SHUTTING_DOWN)) {
+                                    isShuttingDown = true;
+                                }
+                                nodeState.set(Optional.ofNullable(result.getValue()));
+                            }
+                        }
+                        stats.recordSuccess();
                     }
 
                     @Override
-                    public Object handle(Request request, Response response)
+                    public void onFailure(Throwable t)
                     {
-                        stats.recordSuccess();
-                        return null;
+                        stats.recordFailure(new Exception(t));
                     }
-                });
+                }, directExecutor());
             }
             catch (RuntimeException e) {
                 log.warn(e, "Error scheduling request for %s", uri);

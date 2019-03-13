@@ -41,7 +41,7 @@ public class NodeResource
     @GET
     public Collection<HeartbeatFailureDetector.Stats> getNodeStats()
     {
-        return failureDetector.getStats().values();
+        return failureDetector.getStats();
     }
 
     @ResourceSecurity(MANAGEMENT_READ)
@@ -49,6 +49,20 @@ public class NodeResource
     @Path("failed")
     public Collection<HeartbeatFailureDetector.Stats> getFailed()
     {
-        return Maps.filterKeys(failureDetector.getStats(), in(failureDetector.getFailed())).values();
+        return failureDetector.getStatsWithFilters(true, false);
+    }
+
+    @GET
+    @Path("active")
+    public Collection<HeartbeatFailureDetector.Stats> getActive()
+    {
+        return failureDetector.getStatsWithFilters(false, false);
+    }
+
+    @GET
+    @Path("decommissioned")
+    public Collection<HeartbeatFailureDetector.Stats> getDecommissioned()
+    {
+        return failureDetector.getStatsWithFilters(true, true);
     }
 }
