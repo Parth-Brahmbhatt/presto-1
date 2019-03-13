@@ -105,9 +105,9 @@ class IcebergUtil
                 type = partitionField.transform().getResultType(sourceType);
                 columnType = PARTITION_KEY;
             }
-            final io.prestosql.spi.type.Type prestoType = TypeConveter.convert(type, typeManager);
-            final HiveType hiveType = HiveType.toHiveType(hiveTypeTranslator, coerceForHive(prestoType));
-            final HiveColumnHandle columnHandle = new HiveColumnHandle(column.name(), hiveType, prestoType.getTypeSignature(), columnIndex++, columnType, Optional.empty());
+            io.prestosql.spi.type.Type prestoType = TypeConveter.convert(type, typeManager);
+            HiveType hiveType = HiveType.toHiveType(hiveTypeTranslator, coerceForHive(prestoType));
+            HiveColumnHandle columnHandle = new HiveColumnHandle(column.name(), hiveType, prestoType.getTypeSignature(), columnIndex++, columnType, Optional.empty());
             builder.add(columnHandle);
         }
 

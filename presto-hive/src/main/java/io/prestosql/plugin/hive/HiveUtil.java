@@ -321,8 +321,6 @@ public final class HiveUtil
 
     public static long parseHiveTimestamp(String value, DateTimeZone timeZone)
     {
-        //TODO plumbing to be done so we only pack if the type is with zone.
-        // return DateTimeEncoding.packDateTimeWithZone(HIVE_TIMESTAMP_PARSER.withZone(timeZone).parseMillis(value), TimeZoneKey.UTC_KEY);
         return HIVE_TIMESTAMP_PARSER.withZone(timeZone).parseMillis(value);
     }
 

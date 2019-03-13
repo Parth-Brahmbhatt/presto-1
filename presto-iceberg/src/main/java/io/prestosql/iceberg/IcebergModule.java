@@ -22,6 +22,7 @@ import io.prestosql.plugin.hive.CoercionPolicy;
 import io.prestosql.plugin.hive.DirectoryLister;
 import io.prestosql.plugin.hive.DynamicConfigurationProvider;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
+import io.prestosql.plugin.hive.ForCachingHiveMetastore;
 import io.prestosql.plugin.hive.ForHiveClient;
 import io.prestosql.plugin.hive.HadoopDirectoryLister;
 import io.prestosql.plugin.hive.HdfsConfiguration;
@@ -46,12 +47,9 @@ import io.prestosql.plugin.hive.OrcFileWriterConfig;
 import io.prestosql.plugin.hive.ParquetFileWriterConfig;
 import io.prestosql.plugin.hive.PartitionUpdate;
 import io.prestosql.plugin.hive.RcFileFileWriterFactory;
-import io.prestosql.plugin.hive.TableParameterCodec;
 import io.prestosql.plugin.hive.TypeTranslator;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
-import io.prestosql.plugin.hive.metastore.thrift.HiveCluster;
 import io.prestosql.plugin.hive.metastore.thrift.HiveMetastoreClientFactory;
-import io.prestosql.plugin.hive.metastore.thrift.StaticHiveCluster;
 import io.prestosql.plugin.hive.metastore.thrift.StaticMetastoreConfig;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastoreConfig;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
@@ -76,6 +74,7 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
@@ -114,7 +113,6 @@ public class IcebergModule
         binder.bind(NamenodeStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(NamenodeStats.class).as(generatedNameOf(NamenodeStats.class, connectorId));
         binder.bind(HiveMetastoreClientFactory.class).in(Scopes.SINGLETON);
-        binder.bind(HiveCluster.class).to(StaticHiveCluster.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(StaticMetastoreConfig.class);
         configBinder(binder).bindConfig(OrcFileWriterConfig.class);
         binder.bind(NodeManager.class).toInstance(nodeManager);
@@ -132,7 +130,6 @@ public class IcebergModule
         newSetBinder(binder, DynamicConfigurationProvider.class);
 
         binder.bind(LocationService.class).to(HiveLocationService.class).in(Scopes.SINGLETON);
-        binder.bind(TableParameterCodec.class).in(Scopes.SINGLETON);
         binder.bind(IcebergMetadataFactory.class).in(Scopes.SINGLETON);
         binder.bind(HiveTransactionManager.class).in(Scopes.SINGLETON);
 
@@ -162,5 +159,15 @@ public class IcebergModule
     public Function<HiveTransactionHandle, SemiTransactionalHiveMetastore> createMetastoreGetter(HiveTransactionManager transactionManager)
     {
         return transactionHandle -> ((IcebergMetadata) transactionManager.get(transactionHandle)).getMetastore();
+    }
+
+    @ForCachingHiveMetastore
+    @Singleton
+    @Provides
+    public ExecutorService createCachingHiveMetastoreExecutor(HiveClientConfig hiveClientConfig)
+    {
+        return newFixedThreadPool(
+                hiveClientConfig.getMaxMetastoreRefreshThreads(),
+                daemonThreadsNamed("hive-metastore-iceberg-%s"));
     }
 }

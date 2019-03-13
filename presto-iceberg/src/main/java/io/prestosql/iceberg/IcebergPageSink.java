@@ -46,10 +46,10 @@ import org.apache.hadoop.fs.Path;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.prestosql.iceberg.MetricsParser.toJson;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
@@ -112,9 +112,9 @@ public class IcebergPageSink
         this.session = session;
         this.typeManager = typeManager;
         this.fileFormat = fileFormat;
-        this.partitionToWriterContext = new HashMap<>();
-        this.partitionToFile = new HashMap<>();
-        this.partitionToPartitionData = new HashMap<>();
+        this.partitionToWriterContext = new ConcurrentHashMap<>();
+        this.partitionToFile = new ConcurrentHashMap<>();
+        this.partitionToPartitionData = new ConcurrentHashMap<>();
         this.partitionTypes = partitionColumns.stream().map(col -> typeManager.getType(col.getTypeSignature())).collect(toList());
         this.inputColumns = inputColumns;
         this.isNullable = outputSchema.columns().stream().map(column -> column.isOptional()).collect(toList());
@@ -123,13 +123,12 @@ public class IcebergPageSink
     @Override
     public CompletableFuture<?> appendPage(Page page)
     {
-        final int numRows = page.getPositionCount();
+        int numRows = page.getPositionCount();
 
         for (int rowNum = 0; rowNum < numRows; rowNum++) {
-            final PartitionData partitionData = getPartitionData(session, page, rowNum);
-            final String partitionPath = partitionSpec.partitionToPath(partitionData);
+            PartitionData partitionData = getPartitionData(session, page, rowNum);
+            String partitionPath = partitionSpec.partitionToPath(partitionData);
 
-            // TODO check if we need to make this thread safe.
             if (!partitionToWriterContext.containsKey(partitionPath)) {
                 partitionToWriterContext.put(partitionPath, new PartitionWriteContext(new ArrayList<>(), addWriter(partitionPath)));
                 partitionToPartitionData.put(partitionPath, partitionData);
@@ -138,8 +137,8 @@ public class IcebergPageSink
         }
 
         for (Map.Entry<String, PartitionWriteContext> partitionToWriter : partitionToWriterContext.entrySet()) {
-            final List<Integer> rowNums = partitionToWriter.getValue().getRowNum();
-            final FileAppender<Page> writer = partitionToWriter.getValue().getWriter();
+            List<Integer> rowNums = partitionToWriter.getValue().getRowNum();
+            FileAppender<Page> writer = partitionToWriter.getValue().getWriter();
             Page partition = page.getPositions(Ints.toArray(rowNums), 0, rowNums.size());
             writer.add(partition);
         }
@@ -153,7 +152,7 @@ public class IcebergPageSink
         Collection<Slice> commitTasks = new ArrayList<>();
         for (String partition : partitionToFile.keySet()) {
             String file = partitionToFile.get(partition);
-            final FileAppender<Page> fileAppender = partitionToWriterContext.get(partition).getWriter();
+            FileAppender<Page> fileAppender = partitionToWriterContext.get(partition).getWriter();
             try {
                 fileAppender.close();
             }
@@ -161,7 +160,7 @@ public class IcebergPageSink
                 abort();
                 throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Failed to close" + file);
             }
-            final Metrics metrics = fileAppender.metrics();
+            Metrics metrics = fileAppender.metrics();
             String partitionDataJson = partitionToPartitionData.containsKey(partition) ? partitionToPartitionData.get(partition).toJson() : null;
             commitTasks.add(Slices.wrappedBuffer(jsonCodec.toJsonBytes(new CommitTaskData(file, toJson(metrics), partition, partitionDataJson))));
         }
@@ -184,19 +183,15 @@ public class IcebergPageSink
 
     private FileAppender<Page> addWriter(String partitionPath)
     {
-        final Path dataDir = new Path(outputDir);
-        final String pathUUId = randomUUID().toString(); // TODO add more context here instead of just random UUID, ip of the host, taskId
-        final Path outputPath = (partitionPath != null && !partitionPath.isEmpty()) ? new Path(new Path(dataDir, partitionPath), pathUUId) : new Path(dataDir, pathUUId);
-        final String outputFilePath = fileFormat.addExtension(outputPath.toString());
-        final OutputFile outputFile = HadoopOutputFile.fromPath(new Path(outputFilePath), configuration);
+        Path dataDir = new Path(outputDir);
+        String pathUUId = randomUUID().toString(); // TODO add more context here instead of just random UUID, ip of the host, taskId
+        Path outputPath = (partitionPath != null && !partitionPath.isEmpty()) ? new Path(new Path(dataDir, partitionPath), pathUUId) : new Path(dataDir, pathUUId);
+        String outputFilePath = fileFormat.addExtension(outputPath.toString());
+        OutputFile outputFile = HadoopOutputFile.fromPath(new Path(outputFilePath), configuration);
         switch (fileFormat) {
             case PARQUET:
                 try {
-                    final FileAppender<Page> writer = Parquet.write(outputFile)
-                            .set("spark.sql.parquet.writeLegacyFormat", "false")
-                            .set("spark.sql.parquet.binaryAsString", "false")
-                            .set("spark.sql.parquet.int96AsTimestamp", "false")
-                            .set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
+                    FileAppender<Page> writer = Parquet.write(outputFile)
                             .schema(outputSchema)
                             .writeSupport(new PrestoWriteSupport(inputColumns, typeToMessageType.convert(outputSchema, "presto_schema"), outputSchema, typeManager, session, isNullable))
                             .build();
@@ -240,8 +235,8 @@ public class IcebergPageSink
         // TODO only handles identity columns right now, handle all transforms
         Object[] values = new Object[partitionColumns.size()];
         for (int i = 0; i < partitionColumns.size(); i++) {
-            final HiveColumnHandle columnHandle = partitionColumns.get(i);
-            final Type type = partitionTypes.get(i);
+            HiveColumnHandle columnHandle = partitionColumns.get(i);
+            Type type = partitionTypes.get(i);
             values[i] = getValue(session, page.getBlock(columnHandle.getHiveColumnIndex()), rowNum, type);
         }
 

@@ -110,7 +110,7 @@ public class IcebergSplitSource
         while (scanTaskIterator.hasNext() && maxSize != 0) {
             CombinedScanTask combinedScanTask = scanTaskIterator.next();
             for (FileScanTask scanTask : combinedScanTask.files()) {
-                final List<HivePartitionKey> partitionKeys = getPartitionKeys(scanTask);
+                List<HivePartitionKey> partitionKeys = getPartitionKeys(scanTask);
                 List<HostAddress> addresses = getHostAddresses(scanTask.file().path().toString(), scanTask.start(), scanTask.length());
                 splits.add(new IcebergSplit(this.database,
                         this.tableName,
@@ -147,10 +147,10 @@ public class IcebergSplitSource
         for (Map.Entry<PartitionField, Integer> entry : fieldToIndex.entrySet()) {
             PartitionField field = entry.getKey();
             Integer index = entry.getValue();
-            final String name = field.name();
+            String name = field.name();
             Type sourceType = spec.schema().findType(field.sourceId());
-            final Type partitionType = field.transform().getResultType(sourceType);
-            final Class<?> javaClass = partitionType.typeId().javaClass();
+            Type partitionType = field.transform().getResultType(sourceType);
+            Class<?> javaClass = partitionType.typeId().javaClass();
             Object value = partition.get(index, javaClass);
             String partitionValue = HIVE_DEFAULT_DYNAMIC_PARTITION;
             if (value != null) {

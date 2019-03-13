@@ -63,11 +63,11 @@ public class ExpressionConverter
             return Expressions.alwaysFalse();
         }
         else {
-            final Map<HiveColumnHandle, Domain> tDomainMap = tupleDomain.getDomains().get();
+            Map<HiveColumnHandle, Domain> tDomainMap = tupleDomain.getDomains().get();
             Expression expression = Expressions.alwaysTrue();
             for (Map.Entry<HiveColumnHandle, Domain> tDomainEntry : tDomainMap.entrySet()) {
-                final HiveColumnHandle columnHandle = tDomainEntry.getKey();
-                final Domain domain = tDomainEntry.getValue();
+                HiveColumnHandle columnHandle = tDomainEntry.getKey();
+                Domain domain = tDomainEntry.getValue();
                 if (!columnHandle.isHidden()) {
                     expression = Expressions.and(expression, toIceberg(columnHandle, domain, session));
                 }
@@ -89,7 +89,7 @@ public class ExpressionConverter
             return Expressions.isNull(columnName);
         }
         else {
-            final ValueSet domainValues = domain.getValues();
+            ValueSet domainValues = domain.getValues();
             Expression expression = null;
             if (domain.isNullAllowed()) {
                 expression = Expressions.isNull(columnName);
@@ -107,13 +107,13 @@ public class ExpressionConverter
             }
             else {
                 if (domainValues instanceof SortedRangeSet) {
-                    final List<Range> orderedRanges = ((SortedRangeSet) domainValues).getOrderedRanges();
+                    List<Range> orderedRanges = ((SortedRangeSet) domainValues).getOrderedRanges();
                     expression = (expression == null ? Expressions.alwaysFalse() : expression);
                     for (Range range : orderedRanges) {
-                        final Marker low = range.getLow();
-                        final Marker high = range.getHigh();
-                        final Marker.Bound lowBound = low.getBound();
-                        final Marker.Bound highBound = high.getBound();
+                        Marker low = range.getLow();
+                        Marker high = range.getHigh();
+                        Marker.Bound lowBound = low.getBound();
+                        Marker.Bound highBound = high.getBound();
 
                         // case col <> 'val' is represented as (col < 'val' or col > 'val')
                         if (lowBound.equals(EXACTLY) && highBound.equals(EXACTLY)) {
@@ -157,7 +157,7 @@ public class ExpressionConverter
 
     private static Object getValue(HiveColumnHandle columnHandle, Marker marker, ConnectorSession session)
     {
-        final String base = columnHandle.getTypeSignature().getBase();
+        String base = columnHandle.getTypeSignature().getBase();
         if (base.equals(TIMESTAMP_WITH_TIME_ZONE) || base.equals(TIME_WITH_TIME_ZONE)) {
             return TimeUnit.MILLISECONDS.toMicros(DateTimeEncoding.unpackMillisUtc((Long) marker.getValue()));
         }
