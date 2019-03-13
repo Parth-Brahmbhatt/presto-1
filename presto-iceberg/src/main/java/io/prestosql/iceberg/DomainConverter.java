@@ -56,19 +56,19 @@ public class DomainConverter
                 return tupleDomain;
             }
 
-            final Map<HiveColumnHandle, Domain> tDomainMap = tupleDomain.getDomains().get();
-            final Map<HiveColumnHandle, Domain> tDomainTransformedMap = new HashMap<>();
+            Map<HiveColumnHandle, Domain> tDomainMap = tupleDomain.getDomains().get();
+            Map<HiveColumnHandle, Domain> tDomainTransformedMap = new HashMap<>();
             for (Map.Entry<HiveColumnHandle, Domain> tDomainEntry : tDomainMap.entrySet()) {
-                final Domain domain = tDomainEntry.getValue();
-                final ValueSet valueSet = domain.getValues();
+                Domain domain = tDomainEntry.getValue();
+                ValueSet valueSet = domain.getValues();
                 ValueSet transformedValueSet = valueSet;
-                final Type type = domain.getType();
-                final String baseType = type.getTypeSignature().getBase();
+                Type type = domain.getType();
+                String baseType = type.getTypeSignature().getBase();
                 if (type.equals(TIMESTAMP) || type.equals(TIMESTAMP_WITH_TIME_ZONE) || type.equals(TIME)
                         || type.equals(TIME_WITH_TIME_ZONE)) {
                     if (valueSet instanceof EquatableValueSet) {
-                        final EquatableValueSet equatableValueSet = (EquatableValueSet) valueSet;
-                        final Set<ValueEntry> values = equatableValueSet.getEntries().stream().map(
+                        EquatableValueSet equatableValueSet = (EquatableValueSet) valueSet;
+                        Set<ValueEntry> values = equatableValueSet.getEntries().stream().map(
                                 v -> ValueEntry.create(v.getType(), convertToMicros(baseType, (long) v.getValue()))).collect(Collectors.toSet());
                         transformedValueSet = new EquatableValueSet(equatableValueSet.getType(), equatableValueSet.isWhiteList(), values);
                     }

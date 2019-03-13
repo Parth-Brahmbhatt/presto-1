@@ -55,9 +55,9 @@ public class IcebergPageSinkProvider
     @Override
     public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorInsertTableHandle insertTableHandle)
     {
-        final IcebergInsertTableHandle tableHandle = (IcebergInsertTableHandle) insertTableHandle;
-        final HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(session, tableHandle.getSchemaName(), tableHandle.getTableName());
-        final Schema schema = SchemaParser.fromJson(tableHandle.getSchemaAsJson());
+        IcebergInsertTableHandle tableHandle = (IcebergInsertTableHandle) insertTableHandle;
+        HdfsEnvironment.HdfsContext hdfsContext = new HdfsEnvironment.HdfsContext(session, tableHandle.getSchemaName(), tableHandle.getTableName());
+        Schema schema = SchemaParser.fromJson(tableHandle.getSchemaAsJson());
         return new IcebergPageSink(
                 schema,
                 PartitionSpecParser.fromJson(schema, tableHandle.getPartitionSpecAsJson()),

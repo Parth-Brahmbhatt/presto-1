@@ -29,6 +29,7 @@ import io.prestosql.plugin.hive.NodeVersion;
 import io.prestosql.plugin.hive.RebindSafeMBeanServer;
 import io.prestosql.plugin.hive.authentication.HiveAuthenticationModule;
 import io.prestosql.plugin.hive.metastore.ExtendedHiveMetastore;
+import io.prestosql.plugin.hive.metastore.HiveMetastoreModule;
 import io.prestosql.plugin.hive.metastore.thrift.BridgingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.thrift.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastore;
@@ -56,6 +57,7 @@ import javax.management.MBeanServer;
 
 import java.lang.management.ManagementFactory;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -66,12 +68,14 @@ public class IcebergConnectorFactory
 {
     private final String name;
     private final ClassLoader classLoader;
+    private final Optional<ExtendedHiveMetastore> metastore;
 
-    public IcebergConnectorFactory(String name, ClassLoader classLoader)
+    public IcebergConnectorFactory(String name, ClassLoader classLoader, Optional<ExtendedHiveMetastore> metastore)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or empty");
         this.name = name;
         this.classLoader = requireNonNull(classLoader, "classLoader is null");
+        this.metastore = metastore;
     }
 
     @Override
@@ -100,6 +104,7 @@ public class IcebergConnectorFactory
                     new HiveS3Module(),
                     new HiveSecurityModule(),
                     new HiveAuthenticationModule(),
+                    new HiveMetastoreModule(metastore),
                     binder -> {
                         MBeanServer platformMBeanServer = ManagementFactory.getPlatformMBeanServer();
                         binder.bind(MBeanServer.class).toInstance(new RebindSafeMBeanServer(platformMBeanServer));
@@ -107,7 +112,6 @@ public class IcebergConnectorFactory
                         binder.bind(NodeManager.class).toInstance(context.getNodeManager());
                         binder.bind(TypeManager.class).toInstance(context.getTypeManager());
                         binder.bind(HiveMetastore.class).to(ThriftHiveMetastore.class).in(Scopes.SINGLETON);
-                        binder.bind(ExtendedHiveMetastore.class).to(BridgingHiveMetastore.class).in(Scopes.SINGLETON);
                     });
 
             Injector injector = app

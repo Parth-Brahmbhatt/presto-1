@@ -115,10 +115,10 @@ public class IcebergPageSourceProvider
             ConnectorSplit split,
             List<ColumnHandle> columns)
     {
-        final IcebergSplit icebergSplit = (IcebergSplit) split;
-        final Path path = new Path(icebergSplit.getPath());
-        final long start = icebergSplit.getStart();
-        final long length = icebergSplit.getLength();
+        IcebergSplit icebergSplit = (IcebergSplit) split;
+        Path path = new Path(icebergSplit.getPath());
+        long start = icebergSplit.getStart();
+        long length = icebergSplit.getLength();
         List<HiveColumnHandle> hiveColumns = columns.stream()
                 .map(HiveColumnHandle.class::cast)
                 .collect(toList());
@@ -165,7 +165,7 @@ public class IcebergPageSourceProvider
         ParquetDataSource dataSource = null;
         try {
             FileSystem fileSystem = hdfsEnvironment.getFileSystem(user, path, configuration);
-            final long fileSize = fileSystem.getFileStatus(path).getLen();
+            long fileSize = fileSystem.getFileStatus(path).getLen();
             dataSource = buildHdfsParquetDataSource(fileSystem, path, start, length, fileSize, fileFormatDataSourceStats);
             ParquetMetadata parquetMetadata = MetadataReader.readFooter(fileSystem, path, fileSize);
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
@@ -176,8 +176,9 @@ public class IcebergPageSourceProvider
             // use that here to map from iceberg schema column name to ID, lookup parquet column with same ID and all of its children
             // and use the index of all those columns as requested schema.
 
-            final Map<String, HiveColumnHandle> parquetColumns = convertToParquetNames(columns, icebergNameToId, fileSchema);
+            Map<String, HiveColumnHandle> parquetColumns = convertToParquetNames(columns, icebergNameToId, fileSchema);
 
+            // TODO may be move away from streams as this code is executed for each split and streams are known to be slow.
             List<org.apache.parquet.schema.Type> fields = parquetColumns.values().stream()
                     .filter(column -> column.getColumnType() == REGULAR)
                     .map(column -> getParquetType(column, fileSchema, true)) // we always use parquet column names in case of iceberg.
@@ -197,9 +198,9 @@ public class IcebergPageSourceProvider
             Map<List<String>, RichColumnDescriptor> descriptorsByPath = getDescriptors(fileSchema, requestedSchema);
             TupleDomain<ColumnDescriptor> parquetTupleDomain = getParquetTupleDomain(descriptorsByPath, effectivePredicate);
             Predicate parquetPredicate = buildPredicate(requestedSchema, parquetTupleDomain, descriptorsByPath);
-            final ParquetDataSource finalDataSource = dataSource;
+            ParquetDataSource finalDataSource = dataSource;
 
-            final ListIterator<BlockMetaData> blockMetaDataListIterator = blocks.listIterator();
+            ListIterator<BlockMetaData> blockMetaDataListIterator = blocks.listIterator();
             while (blockMetaDataListIterator.hasNext()) {
                 if (!predicateMatches(parquetPredicate, blockMetaDataListIterator.next(), finalDataSource, descriptorsByPath, parquetTupleDomain, failOnCorruptedParquetStatistics)) {
                     blockMetaDataListIterator.remove();
@@ -214,7 +215,7 @@ public class IcebergPageSourceProvider
                     systemMemoryContext,
                     maxReadBlockSize);
 
-            final ImmutableList.Builder<ColumnMapping> mappingBuilder = new ImmutableList.Builder<>();
+            ImmutableList.Builder<ColumnMapping> mappingBuilder = new ImmutableList.Builder<>();
             mappingBuilder.addAll(buildColumnMappings(partitionKeys,
                     columns.stream().filter(columnHandle -> !columnHandle.isHidden()).collect(toList()),
                     emptyList(),
@@ -229,7 +230,7 @@ public class IcebergPageSourceProvider
             // column type from column name and because the name in parquet file is different than the iceberg column name
             // it gets a null back. When it can't find a field it assumes that field is missing and just assigns a null block
             // for the whole field.
-            final List<HiveColumnHandle> columnNameReplaced = columns.stream()
+            List<HiveColumnHandle> columnNameReplaced = columns.stream()
                     .filter(c -> c.getColumnType() == REGULAR)
                     .map(c -> parquetColumns.containsKey(c.getName()) ? parquetColumns.get(c.getName()) : c)
                     .collect(toList());
@@ -260,10 +261,12 @@ public class IcebergPageSourceProvider
             if (e instanceof PrestoException) {
                 throw (PrestoException) e;
             }
-            if (e instanceof ParquetCorruptionException) {
-                throw new PrestoException(HIVE_BAD_DATA, e);
-            }
             String message = format("Error opening Iceberg split %s (offset=%s, length=%s): %s", path, start, length, e.getMessage());
+
+            if (e instanceof ParquetCorruptionException) {
+                throw new PrestoException(HIVE_BAD_DATA, message, e);
+            }
+
             if (e.getClass().getSimpleName().equals("BlockMissingException")) {
                 throw new PrestoException(HIVE_MISSING_DATA, message, e);
             }
@@ -283,19 +286,19 @@ public class IcebergPageSourceProvider
      */
     private Map<String, HiveColumnHandle> convertToParquetNames(List<HiveColumnHandle> columns, Map<String, Integer> icebergNameToId, MessageType parquetSchema)
     {
-        final List<org.apache.parquet.schema.Type> fields = parquetSchema.getFields();
-        final ImmutableMap.Builder<String, HiveColumnHandle> builder = ImmutableMap.builder();
-        final Map<Integer, String> parquetIdToName = fields.stream()
+        List<org.apache.parquet.schema.Type> fields = parquetSchema.getFields();
+        ImmutableMap.Builder<String, HiveColumnHandle> builder = ImmutableMap.builder();
+        Map<Integer, String> parquetIdToName = fields.stream()
                 .filter(field -> field.getId() != null)
                 .collect(Collectors.toMap((x) -> x.getId().intValue(), Type::getName));
 
         for (HiveColumnHandle column : columns) {
             if (!column.isHidden()) {
-                final String name = column.getName();
-                final Integer id = icebergNameToId.get(name);
+                String name = column.getName();
+                Integer id = icebergNameToId.get(name);
                 if (parquetIdToName.containsKey(id)) {
                     String parquetName = parquetIdToName.get(id);
-                    final HiveColumnHandle columnHandle = new HiveColumnHandle(parquetName, column.getHiveType(), column.getTypeSignature(), column.getHiveColumnIndex(), column.getColumnType(), column.getComment());
+                    HiveColumnHandle columnHandle = new HiveColumnHandle(parquetName, column.getHiveType(), column.getTypeSignature(), column.getHiveColumnIndex(), column.getColumnType(), column.getComment());
                     builder.put(name, columnHandle);
                 }
                 else {
