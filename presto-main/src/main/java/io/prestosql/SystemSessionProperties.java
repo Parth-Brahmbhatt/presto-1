@@ -135,6 +135,7 @@ public final class SystemSessionProperties
     private static final String GENIE_STACK = "genie_stack";
     private static final String GENIE_VERSION = "genie_version";
     private static final String QUERY_METADATA = "query_metadata";
+    private static final String GENIE_JOB_GROUPING = "genie_job_grouping";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -614,6 +615,11 @@ public final class SystemSessionProperties
                         QUERY_METADATA,
                         "A json string representation of query metadata",
                         "{}",
+                        true),
+                stringProperty(
+                        GENIE_JOB_GROUPING,
+                        "Genie job grouping set by bdp scheduler",
+                        "",
                         true));
     }
 

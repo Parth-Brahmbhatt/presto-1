@@ -58,8 +58,12 @@ public class QueryCompletionEvent
     private final URI uri;
     private final List<String> fieldNames;
     private final String query;
+    private final String plan;
 
-    private final Long peakMemoryBytes;
+    private final Long peakUserMemoryBytes;
+    private final Long peakTotalMemoryBytes;
+    private final Long peakTaskMemoryBytes;
+    private final Double cumulutaiveMemoryBytes;
 
     private final DateTime createTime;
     private final DateTime executionStartTime;
@@ -72,6 +76,10 @@ public class QueryCompletionEvent
     private final Long totalSplitCpuTimeMs;
     private final Long totalBytes;
     private final Long totalRows;
+    private final Long outputBytes;
+    private final Long outputRows;
+    private final Long writtenBytes;
+    private final Long writtenRows;
 
     private final Integer splits;
 
@@ -120,6 +128,10 @@ public class QueryCompletionEvent
         final java.time.Duration totalSplitCpuTime = event.getStatistics().getCpuTime();
         final long totalDataSize = event.getStatistics().getTotalBytes();
         final long totalRows = event.getStatistics().getTotalRows();
+        final long outputDataSize = event.getStatistics().getOutputBytes();
+        final long outputRows = event.getStatistics().getOutputRows();
+        final long writtenDataSize = event.getStatistics().getWrittenBytes();
+        final long writtenRows = event.getStatistics().getWrittenRows();
         int splits = event.getStatistics().getCompletedSplits();
         final ResourceGroupId resourceGroupId = event.getContext().getResourceGroupId().orElse(null);
         String resourceGroupName;
@@ -170,7 +182,11 @@ public class QueryCompletionEvent
                 uri,
                 fieldNames,
                 query,
-                peakMemoryBytes,
+                plan,
+                peakUserMemoryBytes,
+                peakTotalMemoryBytes,
+                peakTaskMemoryBytes,
+                cumulativeUserMemoryBytes,
                 createTime != null ? new DateTime(createTime.getEpochSecond() * 1000, DateTimeZone.UTC) : null,
                 executionStartTime != null ? new DateTime(executionStartTime.getEpochSecond() * 1000, DateTimeZone.UTC) : null,
                 endTime != null ? new DateTime(endTime.getEpochSecond() * 1000, DateTimeZone.UTC) : null,
@@ -181,6 +197,10 @@ public class QueryCompletionEvent
                 totalSplitCpuTime != null ? new Duration(totalSplitCpuTime.toMillis(), TimeUnit.MILLISECONDS) : null,
                 new DataSize(totalDataSize, DataSize.Unit.BYTE),
                 totalRows,
+                new DataSize(outputDataSize, DataSize.Unit.BYTE),
+                outputRows,
+                new DataSize(writtenDataSize, DataSize.Unit.BYTE),
+                writtenRows,
                 splits,
                 errorCode,
                 failureType,
@@ -210,7 +230,11 @@ public class QueryCompletionEvent
             URI uri,
             List<String> fieldNames,
             String query,
-            Long peakMemoryBytes,
+            String plan,
+            Long peakUserMemoryBytes,
+            Long peakTotalMemoryBytes,
+            Long peakTaskMemoryBytes,
+            Double cumulutaiveMemoryBytes,
             DateTime createTime,
             DateTime executionStartTime,
             DateTime endTime,
@@ -221,6 +245,10 @@ public class QueryCompletionEvent
             Duration totalSplitCpuTime,
             DataSize totalDataSize,
             Long totalRows,
+            DataSize outputDataSize,
+            Long outputRows,
+            DataSize writtenDataSize,
+            Long writtenRows,
             Integer splits,
             ErrorCode errorCode,
             String failureType,
@@ -248,8 +276,12 @@ public class QueryCompletionEvent
         this.uri = uri;
         this.errorCode = errorCode;
         this.fieldNames = ImmutableList.copyOf(fieldNames);
-        this.peakMemoryBytes = peakMemoryBytes;
+        this.peakUserMemoryBytes = peakUserMemoryBytes;
+        this.peakTotalMemoryBytes = peakTotalMemoryBytes;
+        this.peakTaskMemoryBytes = peakTaskMemoryBytes;
+        this.cumulutaiveMemoryBytes = cumulutaiveMemoryBytes;
         this.query = query;
+        this.plan = plan;
         this.createTime = createTime;
         this.executionStartTime = executionStartTime;
         this.endTime = endTime;
@@ -260,6 +292,10 @@ public class QueryCompletionEvent
         this.totalSplitCpuTimeMs = durationToMillis(totalSplitCpuTime);
         this.totalBytes = sizeToBytes(totalDataSize);
         this.totalRows = totalRows;
+        this.outputBytes = sizeToBytes(outputDataSize);
+        this.outputRows = outputRows;
+        this.writtenBytes = sizeToBytes(writtenDataSize);
+        this.writtenRows = writtenRows;
         this.splits = splits;
         this.failureType = failureType;
         this.failureMessage = failureMessage;
@@ -386,9 +422,33 @@ public class QueryCompletionEvent
     }
 
     @EventField
-    public Long getPeakMemoryBytes()
+    public String getPlan()
     {
-        return peakMemoryBytes;
+        return plan;
+    }
+
+    @EventField
+    public Long getPeakUserMemoryBytes()
+    {
+        return peakUserMemoryBytes;
+    }
+
+    @EventField
+    public Long getPeakTotalMemoryBytes()
+    {
+        return peakTotalMemoryBytes;
+    }
+
+    @EventField
+    public Long getPeakTaskMemoryBytes()
+    {
+        return peakTaskMemoryBytes;
+    }
+
+    @EventField
+    public Double getCumulutaiveMemoryBytes()
+    {
+        return cumulutaiveMemoryBytes;
     }
 
     @EventField
@@ -496,6 +556,30 @@ public class QueryCompletionEvent
     public Long getTotalRows()
     {
         return totalRows;
+    }
+
+    @EventField
+    public Long getOutputBytes()
+    {
+        return outputBytes;
+    }
+
+    @EventField
+    public Long getOutputRows()
+    {
+        return outputRows;
+    }
+
+    @EventField
+    public Long getWrittenBytes()
+    {
+        return writtenBytes;
+    }
+
+    @EventField
+    public Long getWrittenRows()
+    {
+        return writtenRows;
     }
 
     @EventField
