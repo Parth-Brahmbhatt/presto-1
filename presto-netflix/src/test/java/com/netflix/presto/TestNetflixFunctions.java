@@ -23,7 +23,8 @@ import java.io.IOException;
 import static com.netflix.presto.NetflixFunctions.addHoursToDateint;
 import static com.netflix.presto.NetflixFunctions.dateDiff;
 import static com.netflix.presto.NetflixFunctions.dateSub;
-import static com.netflix.presto.NetflixFunctions.extractJson;
+import static com.netflix.presto.NetflixFunctions.nfExtractJson;
+import static com.netflix.presto.NetflixFunctions.nfExtractJsonScalar;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
@@ -112,20 +113,32 @@ public class TestNetflixFunctions
         assertEquals(res[2], "f;g;h");
     }
 
+    @Test
     public void testJsonExtract()
             throws IOException
     {
         assertJsonExtract(JSON, "$..book.length()", "[4]");
         assertJsonExtract(JSON, "$.store.object.inner_object.array[0].inner_array[0].x", "\"y\"");
+        assertJsonExtractScalar(JSON, "$.store.object.inner_object.array[0].inner_array[0].x", "y");
         assertJsonExtract(JSON, "$.store.book[*].category", "[\"reference\",\"fiction\",\"fiction\",\"fiction\"]");
+        assertJsonExtractScalar(JSON, "$.store.book[*].category", null);
         assertJsonExtract(JSON, "$.store.bicycle.price", null);
         assertJsonExtract("{\"s\":}", "$", null);
+        assertJsonExtractScalar(JSON, "$.store.book[0].price", "8.95");
     }
 
     private void assertJsonExtract(String json, String jsonPath, String expected)
             throws IOException
     {
-        Slice result = extractJson(utf8Slice(json), utf8Slice(jsonPath));
+        Slice result = nfExtractJson(utf8Slice(json), utf8Slice(jsonPath));
+        String actual = result == null ? null : result.toStringUtf8();
+        assertEquals(actual, expected);
+    }
+
+    private void assertJsonExtractScalar(String json, String jsonPath, String expected)
+            throws IOException
+    {
+        Slice result = nfExtractJsonScalar(utf8Slice(json), utf8Slice(jsonPath));
         String actual = result == null ? null : result.toStringUtf8();
         assertEquals(actual, expected);
     }

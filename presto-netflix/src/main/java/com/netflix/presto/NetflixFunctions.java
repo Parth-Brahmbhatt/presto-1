@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.JsonPathException;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
@@ -408,5 +409,40 @@ public final class NetflixFunctions
     public static Slice nfExtractJson(@SqlType(JSON) Slice json, @SqlType(VARCHAR) Slice jsonPath) throws IOException
     {
         return extractJson(json, jsonPath);
+    }
+
+    @ScalarFunction("nf_json_extract_scalar")
+    @SqlNullable
+    @SqlType(VARCHAR)
+    public static Slice nfVarcharExtractJsonScalar(@SqlType(VARCHAR) Slice json, @SqlType(VARCHAR) Slice jsonPath)
+            throws IOException
+    {
+        String jsonStr = json.toStringUtf8();
+        if (jsonStr == null) {
+            return null;
+        }
+
+        try {
+            Object extractedValue = JsonPath.parse(jsonStr).read(jsonPath.toStringUtf8());
+            if (extractedValue != null) {
+                if ((extractedValue instanceof Number) ||
+                        (extractedValue instanceof String) ||
+                        (extractedValue instanceof Boolean)) {
+                    return utf8Slice(extractedValue.toString());
+                }
+            }
+            return null;
+        }
+        catch (JsonPathException jsonPathException) {
+            return null;
+        }
+    }
+
+    @ScalarFunction("nf_json_extract_scalar")
+    @SqlNullable
+    @SqlType(VARCHAR)
+    public static Slice nfExtractJsonScalar(@SqlType(JSON) Slice json, @SqlType(VARCHAR) Slice jsonPath) throws IOException
+    {
+        return nfVarcharExtractJsonScalar(json, jsonPath);
     }
 }
