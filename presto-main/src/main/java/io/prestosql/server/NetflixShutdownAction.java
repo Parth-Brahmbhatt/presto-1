@@ -13,17 +13,28 @@
  */
 package io.prestosql.server;
 
-import com.google.inject.Binder;
-import com.google.inject.Scopes;
-import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.airlift.log.Logger;
 
-public class GracefulShutdownModule
-        extends AbstractConfigurationAwareModule
+import java.io.File;
+import java.io.FileOutputStream;
+
+public class NetflixShutdownAction
+        implements ShutdownAction
 {
+    private static final Logger log = Logger.get(NetflixShutdownAction.class);
+
     @Override
-    protected void setup(Binder binder)
+    public void onShutdown()
     {
-        binder.bind(ShutdownAction.class).to(NetflixShutdownAction.class).in(Scopes.SINGLETON);
-        binder.bind(GracefulShutdownHandler.class).in(Scopes.SINGLETON);
+        File file = new File("/logs/presto/down");
+        if (!file.exists()) {
+            try {
+                new FileOutputStream(file).close();
+            }
+            catch (Exception e) {
+                // Do nothing
+            }
+        }
+        System.exit(0);
     }
 }
