@@ -15,16 +15,6 @@ package io.prestosql.iceberg;
 
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
-import com.netflix.iceberg.FileFormat;
-import com.netflix.iceberg.PartitionField;
-import com.netflix.iceberg.PartitionSpec;
-import com.netflix.iceberg.Schema;
-import com.netflix.iceberg.Table;
-import com.netflix.iceberg.TableScan;
-import com.netflix.iceberg.expressions.Expression;
-import com.netflix.iceberg.hive.HiveTables;
-import com.netflix.iceberg.types.Type;
-import com.netflix.iceberg.types.Types;
 import io.prestosql.iceberg.type.TypeConveter;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveType;
@@ -35,7 +25,19 @@ import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableScan;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.hive.HiveTables;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,16 +46,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.netflix.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
-import static com.netflix.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
-import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
-import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
-import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static java.util.stream.Collectors.toMap;
+import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
+import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 
 class IcebergUtil
 {
@@ -62,8 +61,6 @@ class IcebergUtil
     private static final TypeTranslator hiveTypeTranslator = new HiveTypeTranslator();
     private static final String PATH_SEPERATOR = "/";
     public static final String DATA_DIR_NAME = "data";
-    public static final String SNAPSHOT_ID = "$snapshot_id";
-    public static final String SNAPSHOT_TIMESTAMP_MS = "$snapshot_timestamp_ms";
 
     @Inject
     public IcebergUtil()
@@ -111,9 +108,6 @@ class IcebergUtil
             builder.add(columnHandle);
         }
 
-        builder.add(new HiveColumnHandle(SNAPSHOT_ID, HIVE_LONG, BIGINT.getTypeSignature(), columnIndex++, SYNTHESIZED, Optional.empty()));
-        builder.add(new HiveColumnHandle(SNAPSHOT_TIMESTAMP_MS, HIVE_LONG, BIGINT.getTypeSignature(), columnIndex++, SYNTHESIZED, Optional.empty()));
-
         return builder.build();
     }
 
@@ -151,22 +145,30 @@ class IcebergUtil
                 .toUpperCase(Locale.ENGLISH));
     }
 
-    public TableScan getTableScan(ConnectorSession session, TupleDomain<HiveColumnHandle> predicates, Long snapshotId, Long snapshotTimestamp, Table icebergTable)
+    public final TableScan getTableScan(ConnectorSession session, TupleDomain<HiveColumnHandle> predicates, Long id, Table icebergTable)
     {
-        if (snapshotId != null && snapshotTimestamp != null) {
-            throw new IllegalArgumentException(String.format("Either specify a predicate on %s or %s but not both", SNAPSHOT_ID, SNAPSHOT_TIMESTAMP_MS));
-        }
-
         final Expression expression = ExpressionConverter.toIceberg(predicates, session);
         TableScan tableScan = icebergTable.newScan().filter(expression);
-
-        if (snapshotId != null) {
-            tableScan = tableScan.useSnapshot(snapshotId);
-        }
-        else if (snapshotTimestamp != null) {
-            tableScan = tableScan.asOfTime(snapshotTimestamp);
+        if (id != null) {
+            if (isSnapshot(icebergTable, id)) {
+                tableScan = tableScan.useSnapshot(id);
+            }
+            else {
+                tableScan = tableScan.asOfTime(id);
+            }
         }
         return tableScan;
+    }
+
+    private boolean isSnapshot(Table icebergTable, Long id)
+    {
+        Iterator<Snapshot> snapshots = icebergTable.snapshots().iterator();
+        while (snapshots != null && snapshots.hasNext()) {
+            if (snapshots.next().snapshotId() == id) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Long getPredicateValue(TupleDomain<HiveColumnHandle> predicates, String columnName)

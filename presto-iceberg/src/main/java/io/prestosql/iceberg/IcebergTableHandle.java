@@ -13,21 +13,36 @@
  */
 package io.prestosql.iceberg;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
+import io.airlift.log.Logger;
 import io.prestosql.spi.connector.ConnectorTableHandle;
+
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class IcebergTableHandle
         implements ConnectorTableHandle
 {
+    private static final Pattern TABLE_PATTERN = Pattern.compile(
+            "(?<table>[^$@]+)(?:@(?<ver1>[^$]*))?(?:\\$(?<type>[^@]*)(?:@(?<ver2>.*))?)?");
+    private static final Logger LOG = Logger.get(IcebergTableHandle.class);
+
     private final String schemaName;
     private final String tableName;
+    private final TableType tableType;
+    private final Long atId;
 
-    @JsonCreator
-    public IcebergTableHandle(@JsonProperty("schemaName") String schemaName, @JsonProperty("tableName") String tableName)
+    public IcebergTableHandle(@JsonProperty("schemaName") String schemaName,
+            @JsonProperty("tableName") String tableName,
+            @JsonProperty("tableType") TableType tableType,
+            @JsonProperty("atId") Long atId)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
+        this.atId = atId;
+        this.tableType = tableType;
     }
 
     @JsonProperty
@@ -42,29 +57,65 @@ public class IcebergTableHandle
         return tableName;
     }
 
-    @Override
-    public boolean equals(Object o)
+    @JsonProperty
+    public TableType getTableType()
     {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
-        IcebergTableHandle that = (IcebergTableHandle) o;
-
-        if (schemaName != null ? !schemaName.equals(that.schemaName) : that.schemaName != null) {
-            return false;
-        }
-        return tableName != null ? tableName.equals(that.tableName) : that.tableName == null;
+        return tableType;
     }
 
-    @Override
-    public int hashCode()
+    @JsonProperty
+    public Long getAtId()
     {
-        int result = schemaName != null ? schemaName.hashCode() : 0;
-        result = 31 * result + (tableName != null ? tableName.hashCode() : 0);
-        return result;
+        return atId;
+    }
+
+    public static IcebergTableHandle parse(String tableIdentifier, String schemaName)
+    {
+        Matcher match = TABLE_PATTERN.matcher(tableIdentifier);
+        if (match.matches()) {
+            try {
+                String table = match.group("table");
+                String typeStr = match.group("type");
+                String ver1 = match.group("ver1");
+                String ver2 = match.group("ver2");
+
+                TableType type;
+                if (typeStr != null) {
+                    type = TableType.valueOf(typeStr.toUpperCase(Locale.ROOT));
+                }
+                else {
+                    type = TableType.DATA;
+                }
+
+                Long version;
+                if (type == TableType.DATA ||
+                        type == TableType.PARTITIONS ||
+                        type == TableType.MANIFESTS) {
+                    Preconditions.checkArgument(ver1 == null || ver2 == null,
+                            "Cannot specify two @ versions");
+                    if (ver1 != null) {
+                        version = Long.parseLong(ver1);
+                    }
+                    else if (ver2 != null) {
+                        version = Long.parseLong(ver2);
+                    }
+                    else {
+                        version = null;
+                    }
+                }
+                else {
+                    Preconditions.checkArgument(ver1 == null && ver2 == null,
+                            "Cannot use @ version with table type %s: %s", typeStr, tableIdentifier);
+                    version = null;
+                }
+
+                return new IcebergTableHandle(schemaName, table, type, version);
+            }
+            catch (IllegalArgumentException e) {
+                LOG.warn("Failed to parse table name, using {}: {}", tableIdentifier, e.getMessage());
+            }
+        }
+
+        return new IcebergTableHandle(schemaName, tableIdentifier, TableType.DATA, null);
     }
 }

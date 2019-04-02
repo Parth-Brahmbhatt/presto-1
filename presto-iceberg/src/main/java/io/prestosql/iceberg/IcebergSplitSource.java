@@ -14,14 +14,6 @@
 package io.prestosql.iceberg;
 
 import com.google.common.collect.Lists;
-import com.netflix.iceberg.CombinedScanTask;
-import com.netflix.iceberg.FileScanTask;
-import com.netflix.iceberg.PartitionField;
-import com.netflix.iceberg.PartitionSpec;
-import com.netflix.iceberg.Schema;
-import com.netflix.iceberg.StructLike;
-import com.netflix.iceberg.types.Type;
-import com.netflix.iceberg.types.Types.NestedField;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HivePartitionKey;
@@ -34,6 +26,14 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
+import org.apache.iceberg.CombinedScanTask;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.StructLike;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types.NestedField;
 
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -71,8 +71,6 @@ public class IcebergSplitSource
     private final HdfsEnvironment.HdfsContext hdfsContext;
     private boolean closed;
     private Map<String, HiveColumnHandle> columnNameToHiveColumnHandleMap;
-    private final Long snapshotId;
-    private final Long snapshotTimestamp;
 
     public IcebergSplitSource(String database,
             String tableName,
@@ -83,9 +81,7 @@ public class IcebergSplitSource
             HdfsEnvironment hdfsEnvironment,
             TypeTranslator typeTranslator,
             TypeManager typeRegistry,
-            Map<String, HiveColumnHandle> columnNameToHiveColumnHandleMap,
-            Long snapshotId,
-            Long snapshotTimestamp)
+            Map<String, HiveColumnHandle> columnNameToHiveColumnHandleMap)
     {
         this.database = database;
         this.tableName = tableName;
@@ -94,8 +90,6 @@ public class IcebergSplitSource
         this.session = session;
         this.tableSchema = schema;
         this.hdfsEnvironment = hdfsEnvironment;
-        this.snapshotId = snapshotId;
-        this.snapshotTimestamp = snapshotTimestamp;
         this.hdfsContext = new HdfsEnvironment.HdfsContext(session, database, tableName);
         this.typeTranslator = typeTranslator;
         this.typeRegistry = typeRegistry;
@@ -124,9 +118,7 @@ public class IcebergSplitSource
                         // wasting CPU cycles on reader side evaluating condition that we know will always be true.
                         predicates,
                         partitionKeys,
-                        HiveSessionProperties.isForceLocalScheduling(this.session),
-                        snapshotId,
-                        snapshotTimestamp));
+                        HiveSessionProperties.isForceLocalScheduling(this.session)));
 
                 maxSize--;
             }

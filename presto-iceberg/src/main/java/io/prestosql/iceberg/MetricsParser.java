@@ -15,9 +15,9 @@ package io.prestosql.iceberg;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.netflix.iceberg.Metrics;
-import com.netflix.iceberg.exceptions.RuntimeIOException;
-import com.netflix.iceberg.util.JsonUtil;
+import org.apache.iceberg.Metrics;
+import org.apache.iceberg.exceptions.RuntimeIOException;
+import org.apache.iceberg.util.JsonUtil;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -25,7 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.netflix.iceberg.util.JsonUtil.factory;
+import static org.apache.iceberg.util.JsonUtil.factory;
 
 // TODO this needs to part of Iceberg otherwise we could miss metrics that are newly added on iceberg side.
 public class MetricsParser

@@ -14,7 +14,6 @@
 package io.prestosql.iceberg.type;
 
 import com.google.common.collect.ImmutableList;
-import com.netflix.iceberg.types.Types;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.BigintType;
@@ -33,6 +32,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarbinaryType;
 import io.prestosql.spi.type.VarcharType;
+import org.apache.iceberg.types.Types;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
@@ -47,7 +47,7 @@ import static io.prestosql.spi.block.MethodHandleUtil.nativeValueGetter;
 
 public class TypeConveter
 {
-    private static Map<Class<Type>, com.netflix.iceberg.types.Type> prestoTypeToIcebergType = new HashMap()
+    private static Map<Class<Type>, org.apache.iceberg.types.Type> prestoTypeToIcebergType = new HashMap()
     {
         {
             put(BooleanType.class, Types.BooleanType.get());
@@ -68,7 +68,7 @@ public class TypeConveter
     {
     }
 
-    public static Type convert(com.netflix.iceberg.types.Type type, TypeManager typeManager)
+    public static Type convert(org.apache.iceberg.types.Type type, TypeManager typeManager)
     {
         switch (type.typeId()) {
             case BOOLEAN:
@@ -79,7 +79,7 @@ public class TypeConveter
             case DATE:
                 return DateType.DATE;
             case DECIMAL:
-                com.netflix.iceberg.types.Types.DecimalType decimalType = (com.netflix.iceberg.types.Types.DecimalType) type;
+                org.apache.iceberg.types.Types.DecimalType decimalType = (org.apache.iceberg.types.Types.DecimalType) type;
                 return DecimalType.createDecimalType(decimalType.precision(), decimalType.scale());
             case DOUBLE:
                 return DoubleType.DOUBLE;
@@ -92,7 +92,7 @@ public class TypeConveter
             case TIME:
                 return TimeType.TIME;
             case TIMESTAMP:
-                com.netflix.iceberg.types.Types.TimestampType timestampType = (com.netflix.iceberg.types.Types.TimestampType) type;
+                org.apache.iceberg.types.Types.TimestampType timestampType = (org.apache.iceberg.types.Types.TimestampType) type;
                 if (timestampType.shouldAdjustToUTC()) {
                     return TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
                 }
@@ -103,18 +103,18 @@ public class TypeConveter
             case STRING:
                 return VarcharType.createUnboundedVarcharType();
             case STRUCT:
-                com.netflix.iceberg.types.Types.StructType structType = (com.netflix.iceberg.types.Types.StructType) type;
-                List<com.netflix.iceberg.types.Types.NestedField> fields = structType.fields();
+                org.apache.iceberg.types.Types.StructType structType = (org.apache.iceberg.types.Types.StructType) type;
+                List<org.apache.iceberg.types.Types.NestedField> fields = structType.fields();
                 List<RowType.Field> fieldList = new ArrayList<>();
-                for (com.netflix.iceberg.types.Types.NestedField field : fields) {
+                for (org.apache.iceberg.types.Types.NestedField field : fields) {
                     fieldList.add(new RowType.Field(Optional.of(field.name()), convert(field.type(), typeManager)));
                 }
                 return RowType.from(fieldList);
             case LIST:
-                com.netflix.iceberg.types.Types.ListType listType = (com.netflix.iceberg.types.Types.ListType) type;
+                org.apache.iceberg.types.Types.ListType listType = (org.apache.iceberg.types.Types.ListType) type;
                 return new ArrayType(convert(listType.elementType(), typeManager));
             case MAP:
-                com.netflix.iceberg.types.Types.MapType mapType = (com.netflix.iceberg.types.Types.MapType) type;
+                org.apache.iceberg.types.Types.MapType mapType = (org.apache.iceberg.types.Types.MapType) type;
                 Type keyType = convert(mapType.keyType(), typeManager);
                 Type valType = convert(mapType.valueType(), typeManager);
                 MethodHandle keyNativeEquals = typeManager.resolveOperator(OperatorType.EQUAL, ImmutableList.of(keyType, keyType));
@@ -134,7 +134,7 @@ public class TypeConveter
         }
     }
 
-    public static com.netflix.iceberg.types.Type convert(Type type)
+    public static org.apache.iceberg.types.Type convert(Type type)
     {
         if (prestoTypeToIcebergType.containsKey(type.getClass())) {
             return prestoTypeToIcebergType.get(type.getClass());
@@ -156,12 +156,12 @@ public class TypeConveter
         }
     }
 
-    private static com.netflix.iceberg.types.Type handle(DecimalType type)
+    private static org.apache.iceberg.types.Type handle(DecimalType type)
     {
         return Types.DecimalType.of(type.getPrecision(), type.getScale());
     }
 
-    private static com.netflix.iceberg.types.Type handle(RowType type)
+    private static org.apache.iceberg.types.Type handle(RowType type)
     {
         final List<RowType.Field> fields = type.getFields();
         // TODO 1 needs to be an incremented ID and field.getName() is optional so we need to throw an exception if it has no value.
@@ -169,12 +169,12 @@ public class TypeConveter
         return Types.StructType.of(icebergRowFields);
     }
 
-    private static com.netflix.iceberg.types.Type handle(ArrayType type)
+    private static org.apache.iceberg.types.Type handle(ArrayType type)
     {
         return Types.ListType.ofOptional(1, convert(type.getElementType()));
     }
 
-    private static com.netflix.iceberg.types.Type handle(MapType type)
+    private static org.apache.iceberg.types.Type handle(MapType type)
     {
         return Types.MapType.ofOptional(1, 2, convert(type.getKeyType()), convert(type.getValueType()));
     }
