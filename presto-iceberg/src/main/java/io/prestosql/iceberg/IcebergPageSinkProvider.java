@@ -13,9 +13,6 @@
  */
 package io.prestosql.iceberg;
 
-import com.netflix.iceberg.PartitionSpecParser;
-import com.netflix.iceberg.Schema;
-import com.netflix.iceberg.SchemaParser;
 import io.airlift.json.JsonCodec;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
@@ -26,6 +23,9 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.fs.Path;
+import org.apache.iceberg.PartitionSpecParser;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
 
 import javax.inject.Inject;
 

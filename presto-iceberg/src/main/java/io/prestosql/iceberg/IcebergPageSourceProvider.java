@@ -13,7 +13,6 @@
  */
 package io.prestosql.iceberg;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.AggregatedMemoryContext;
@@ -66,8 +65,6 @@ import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import static io.prestosql.iceberg.IcebergUtil.SNAPSHOT_ID;
-import static io.prestosql.iceberg.IcebergUtil.SNAPSHOT_TIMESTAMP_MS;
 import static io.prestosql.parquet.ParquetTypeUtils.getColumnIO;
 import static io.prestosql.parquet.ParquetTypeUtils.getDescriptors;
 import static io.prestosql.parquet.predicate.PredicateUtils.buildPredicate;
@@ -136,12 +133,10 @@ public class IcebergPageSourceProvider
                 isFailOnCorruptedParquetStatistics(session),
                 icebergSplit.getEffectivePredicate(),
                 icebergSplit.getPartitionKeys(),
-                fileFormatDataSourceStats,
-                icebergSplit.getSnapshotId(),
-                icebergSplit.getSnapshotTimestamp());
+                fileFormatDataSourceStats);
     }
 
-    public ConnectorPageSource createParquetPageSource(
+    private ConnectorPageSource createParquetPageSource(
             HdfsEnvironment hdfsEnvironment,
             String user,
             Configuration configuration,
@@ -156,9 +151,7 @@ public class IcebergPageSourceProvider
             boolean failOnCorruptedParquetStatistics,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             List<HivePartitionKey> partitionKeys,
-            FileFormatDataSourceStats fileFormatDataSourceStats,
-            Long snapshotId,
-            Long snapshotTimeStamp)
+            FileFormatDataSourceStats fileFormatDataSourceStats)
     {
         AggregatedMemoryContext systemMemoryContext = AggregatedMemoryContext.newSimpleAggregatedMemoryContext();
 
@@ -215,16 +208,12 @@ public class IcebergPageSourceProvider
                     systemMemoryContext,
                     maxReadBlockSize);
 
-            ImmutableList.Builder<ColumnMapping> mappingBuilder = new ImmutableList.Builder<>();
-            mappingBuilder.addAll(buildColumnMappings(partitionKeys,
+            List<ColumnMapping> columnMappings = buildColumnMappings(partitionKeys,
                     columns.stream().filter(columnHandle -> !columnHandle.isHidden()).collect(toList()),
                     emptyList(),
                     Collections.emptyMap(),
                     path,
-                    OptionalInt.empty()));
-
-            setIfPresent(mappingBuilder, getColumnHandle(SNAPSHOT_ID, columns), String.valueOf(snapshotId));
-            setIfPresent(mappingBuilder, getColumnHandle(SNAPSHOT_TIMESTAMP_MS, columns), String.valueOf(snapshotTimeStamp));
+                    OptionalInt.empty());
 
             // This transformation is solely done so columns that are renames can be read. ParquetPageSource tries to get
             // column type from column name and because the name in parquet file is different than the iceberg column name
@@ -232,11 +221,11 @@ public class IcebergPageSourceProvider
             // for the whole field.
             List<HiveColumnHandle> columnNameReplaced = columns.stream()
                     .filter(c -> c.getColumnType() == REGULAR)
-                    .map(c -> parquetColumns.containsKey(c.getName()) ? parquetColumns.get(c.getName()) : c)
+                    .map(c -> parquetColumns.getOrDefault(c.getName(), c))
                     .collect(toList());
 
             return new HivePageSource(
-                    mappingBuilder.build(),
+                    columnMappings,
                     Optional.empty(),
                     DateTimeZone.UTC,
                     typeManager,
@@ -280,8 +269,8 @@ public class IcebergPageSourceProvider
      * If any parquet field has an Id, it returns a column name that has the same icebergId. If no icebergId matches the given parquetId, it assumes
      * the column must have been added to table later and does not return any column name for that column.
      * @param columns iceberg columns
-     * @param icebergNameToId
-     * @param parquetSchema
+     * @param icebergNameToId column name to id
+     * @param parquetSchema parquet file schema
      * @return Map from iceberg column names to column handles with replace column names.
      */
     private Map<String, HiveColumnHandle> convertToParquetNames(List<HiveColumnHandle> columns, Map<String, Integer> icebergNameToId, MessageType parquetSchema)
@@ -314,18 +303,5 @@ public class IcebergPageSourceProvider
             }
         }
         return builder.build();
-    }
-
-    private final Optional<HiveColumnHandle> getColumnHandle(String columnName, List<HiveColumnHandle> columns)
-    {
-        // Assumes the call is only made for columns that are always present
-        return columns.stream().filter(columnHandle -> columnHandle.getName().equals(columnName)).findFirst();
-    }
-
-    private void setIfPresent(ImmutableList.Builder<ColumnMapping> mappingBuilder, Optional<HiveColumnHandle> columnHandle, String value)
-    {
-        if (columnHandle.isPresent()) {
-            mappingBuilder.add(ColumnMapping.prefilled(columnHandle.get(), value, Optional.empty()));
-        }
     }
 }

@@ -15,10 +15,10 @@ package io.prestosql.iceberg;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.netflix.iceberg.FileFormat;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
+import org.apache.iceberg.FileFormat;
 
 import java.util.List;
 

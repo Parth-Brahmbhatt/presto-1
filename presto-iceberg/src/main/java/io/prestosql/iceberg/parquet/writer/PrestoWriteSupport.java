@@ -13,7 +13,6 @@
  */
 package io.prestosql.iceberg.parquet.writer;
 
-import com.netflix.iceberg.Schema;
 import io.prestosql.iceberg.type.TypeConveter;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HiveErrorCode;
@@ -41,6 +40,7 @@ import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.VarbinaryType;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.iceberg.Schema;
 import org.apache.parquet.hadoop.api.WriteSupport;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.io.api.RecordConsumer;
@@ -51,21 +51,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import static com.netflix.iceberg.types.Type.TypeID.BINARY;
-import static com.netflix.iceberg.types.Type.TypeID.BOOLEAN;
-import static com.netflix.iceberg.types.Type.TypeID.DATE;
-import static com.netflix.iceberg.types.Type.TypeID.DOUBLE;
-import static com.netflix.iceberg.types.Type.TypeID.FIXED;
-import static com.netflix.iceberg.types.Type.TypeID.FLOAT;
-import static com.netflix.iceberg.types.Type.TypeID.INTEGER;
-import static com.netflix.iceberg.types.Type.TypeID.LONG;
-import static com.netflix.iceberg.types.Type.TypeID.STRING;
-import static com.netflix.iceberg.types.Type.TypeID.UUID;
 import static io.prestosql.iceberg.type.TypeConveter.convert;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
+import static org.apache.iceberg.types.Type.TypeID.BINARY;
+import static org.apache.iceberg.types.Type.TypeID.BOOLEAN;
+import static org.apache.iceberg.types.Type.TypeID.DATE;
+import static org.apache.iceberg.types.Type.TypeID.DOUBLE;
+import static org.apache.iceberg.types.Type.TypeID.FIXED;
+import static org.apache.iceberg.types.Type.TypeID.FLOAT;
+import static org.apache.iceberg.types.Type.TypeID.INTEGER;
+import static org.apache.iceberg.types.Type.TypeID.LONG;
+import static org.apache.iceberg.types.Type.TypeID.STRING;
+import static org.apache.iceberg.types.Type.TypeID.UUID;
 
 public class PrestoWriteSupport
         extends WriteSupport<Page>
@@ -455,7 +455,7 @@ public class PrestoWriteSupport
             put(DOUBLE, new DoubleWriter());
             put(INTEGER, new IntWriter());
             put(DATE, new DateWriter());
-            //TODO put(com.netflix.iceberg.types.Type.TypeID.TIME, new TimeWriter());
+            //TODO put(org.apache.iceberg.types.Type.TypeID.TIME, new TimeWriter());
             put(STRING, new StringWriter());
             put(UUID, new StringWriter());
             put(FIXED, new BinaryWriter());
@@ -464,7 +464,7 @@ public class PrestoWriteSupport
 
     private final ColumnWriter getWriter(Type type)
     {
-        final com.netflix.iceberg.types.Type icebergType = TypeConveter.convert(type);
+        final org.apache.iceberg.types.Type icebergType = TypeConveter.convert(type);
         if (writerMap.containsKey(icebergType.typeId())) {
             return writerMap.get(icebergType.typeId());
         }

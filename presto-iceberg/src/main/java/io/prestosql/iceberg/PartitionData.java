@@ -17,9 +17,9 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.netflix.iceberg.StructLike;
-import com.netflix.iceberg.exceptions.RuntimeIOException;
-import com.netflix.iceberg.types.Type;
+import org.apache.iceberg.StructLike;
+import org.apache.iceberg.exceptions.RuntimeIOException;
+import org.apache.iceberg.types.Type;
 
 import java.io.IOException;
 import java.io.StringWriter;

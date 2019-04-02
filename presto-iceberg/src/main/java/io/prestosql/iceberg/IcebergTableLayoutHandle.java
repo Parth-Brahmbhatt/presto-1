@@ -27,6 +27,7 @@ public class IcebergTableLayoutHandle
 {
     private final String database;
     private final String tableName;
+    private final Long atId;
     private final TupleDomain<ColumnHandle> predicates;
     private final Map<String, HiveColumnHandle> nameToColumnHandle;
 
@@ -34,11 +35,13 @@ public class IcebergTableLayoutHandle
     public IcebergTableLayoutHandle(
             @JsonProperty("database") String database,
             @JsonProperty("tableName") String tableName,
+            @JsonProperty("atId") Long atId,
             @JsonProperty("predicates") TupleDomain<ColumnHandle> predicates,
             @JsonProperty("nameToColumnHandle") Map<String, HiveColumnHandle> nameToColumnHandle)
     {
         this.database = database;
         this.tableName = tableName;
+        this.atId = atId;
         this.predicates = predicates;
         this.nameToColumnHandle = nameToColumnHandle;
     }
@@ -65,5 +68,11 @@ public class IcebergTableLayoutHandle
     public Map<String, HiveColumnHandle> getNameToColumnHandle()
     {
         return this.nameToColumnHandle;
+    }
+
+    @JsonProperty
+    public Long getAtId()
+    {
+        return atId;
     }
 }

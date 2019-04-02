@@ -24,14 +24,14 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <air.check.skip-checkstyle>true</air.check.skip-checkstyle>
+        <air.check.skip-enforcer>true</air.check.skip-enforcer>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.github.Parth-Brahmbhatt.incubator-iceberg</groupId>
             <artifactId>iceberg-presto-runtime</artifactId>
-            <version>presto-sql-150d58ade7-1</version>
+            <version>iceberg-presto-runtime-fa2d11d4bf-1</version>
         </dependency>
 
         <dependency>
@@ -55,6 +55,10 @@
                 <exclusion>
                     <groupId>io.prestosql</groupId>
                     <artifactId>presto-parquet</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.thrif</groupId>
+                    <artifactId>libthrift</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
