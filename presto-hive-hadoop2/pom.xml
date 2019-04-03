@@ -23,6 +23,13 @@
         </dependency>
 
         <dependency>
+            <groupId>netflix</groupId>
+            <artifactId>bdp-emr-credentials</artifactId>
+            <version>1.5.0</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
