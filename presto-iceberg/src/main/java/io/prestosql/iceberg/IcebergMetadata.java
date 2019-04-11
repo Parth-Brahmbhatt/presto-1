@@ -44,6 +44,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.connector.TableNotFoundException;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.Type;
@@ -67,8 +68,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import static io.prestosql.plugin.hive.HiveColumnHandle.updateRowIdHandle;
 import static io.prestosql.plugin.hive.HiveTableProperties.getPartitionedBy;
 import static io.prestosql.plugin.hive.HiveUtil.schemaTableName;
 import static java.util.Collections.emptyList;
@@ -155,13 +159,28 @@ public class IcebergMetadata
                 .map(cols -> cols.stream().map(HiveColumnHandle.class::cast)
                         .collect(toMap(HiveColumnHandle::getName, identity())))
                 .orElse(emptyMap());
+
+        TupleDomain<HiveColumnHandle> predicates = constraint.getSummary().getDomains()
+                .map(m -> m.entrySet().stream().collect(Collectors.toMap((x) -> HiveColumnHandle.class.cast(x.getKey()), Map.Entry::getValue)))
+                .map(m -> TupleDomain.withColumnDomains(m)).orElse(TupleDomain.none());
+
+        // TODO The only predicates that will be applied by engines are the ones that we return in ConnectorTableLayoutResult
+        // so when we start supporting non identity partitions we will either need to perform a scan here and return the residual from scan
+        // or we will need to return both partition and non partition predicates which would brake Delete as we do not implement beginDelete
+        // and endDelete but instead we implement metadataDelete as the actual row level delete is not supported by iceberg.
+
+        TupleDomain<ColumnHandle> nonPartitionPredicate = constraint.getSummary().getDomains()
+                .map(m -> m.entrySet().stream().filter(e -> ((HiveColumnHandle) e.getKey()).getColumnType() != HiveColumnHandle.ColumnType.PARTITION_KEY)
+                        .collect(Collectors.toMap((x) -> x.getKey(), Map.Entry::getValue)))
+                .map(m -> TupleDomain.withColumnDomains(m)).orElse(TupleDomain.none());
+
         // TODO Optimization opportunity if we provide proper IcebergTableLayoutHandle so we do not have to keep loading iceberg table from the metadata.
         IcebergTableLayoutHandle icebergTableLayoutHandle = new IcebergTableLayoutHandle(tableHandle.getSchemaName(),
                 tableHandle.getTableName(),
                 tableHandle.getAtId(),
-                constraint.getSummary(),
+                predicates,
                 nameToHiveColumnHandleMap);
-        return ImmutableList.of(new ConnectorTableLayoutResult(new ConnectorTableLayout(icebergTableLayoutHandle), constraint.getSummary()));
+        return ImmutableList.of(new ConnectorTableLayoutResult(new ConnectorTableLayout(icebergTableLayoutHandle), nonPartitionPredicate));
     }
 
     @Override
@@ -478,6 +497,34 @@ public class IcebergMetadata
     private Configuration getConfiguration(ConnectorSession session, String schemaName)
     {
         return hdfsEnvironment.getConfiguration(new HdfsEnvironment.HdfsContext(session, schemaName), new Path("file:///tmp"));
+    }
+
+    @Override
+    public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return updateRowIdHandle();
+    }
+
+    @Override
+    public boolean supportsMetadataDelete(ConnectorSession session, ConnectorTableHandle tableHandle, ConnectorTableLayoutHandle tableLayoutHandle)
+    {
+        return true;
+    }
+
+    @Override
+    public OptionalLong metadataDelete(ConnectorSession session, ConnectorTableHandle tableHandle, ConnectorTableLayoutHandle tableLayoutHandle)
+    {
+        IcebergTableHandle handle = (IcebergTableHandle) tableHandle;
+        IcebergTableLayoutHandle layoutHandle = (IcebergTableLayoutHandle) tableLayoutHandle;
+
+        final Configuration configuration = getConfiguration(session, handle.getSchemaName());
+        org.apache.iceberg.Table icebergTable = icebergUtil.getIcebergTable(handle.getSchemaName(), handle.getTableName(), configuration);
+        icebergTable.newDelete()
+                .deleteFromRowFilter(ExpressionConverter.toIceberg(layoutHandle.getPredicates(), session))
+                .commit();
+
+        // TODO in case of iceberg it should be possible to return number of deleted records easily.
+        return OptionalLong.empty();
     }
 
     @Override

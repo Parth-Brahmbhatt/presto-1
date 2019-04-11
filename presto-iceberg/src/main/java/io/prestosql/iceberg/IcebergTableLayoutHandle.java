@@ -16,7 +16,6 @@ package io.prestosql.iceberg;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.plugin.hive.HiveColumnHandle;
-import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 
@@ -28,7 +27,7 @@ public class IcebergTableLayoutHandle
     private final String database;
     private final String tableName;
     private final Long atId;
-    private final TupleDomain<ColumnHandle> predicates;
+    private final TupleDomain<HiveColumnHandle> predicates;
     private final Map<String, HiveColumnHandle> nameToColumnHandle;
 
     @JsonCreator
@@ -36,7 +35,7 @@ public class IcebergTableLayoutHandle
             @JsonProperty("database") String database,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("atId") Long atId,
-            @JsonProperty("predicates") TupleDomain<ColumnHandle> predicates,
+            @JsonProperty("predicates") TupleDomain<HiveColumnHandle> predicates,
             @JsonProperty("nameToColumnHandle") Map<String, HiveColumnHandle> nameToColumnHandle)
     {
         this.database = database;
@@ -59,7 +58,7 @@ public class IcebergTableLayoutHandle
     }
 
     @JsonProperty
-    public TupleDomain<ColumnHandle> getPredicates()
+    public TupleDomain<HiveColumnHandle> getPredicates()
     {
         return this.predicates;
     }
