@@ -82,77 +82,77 @@ public class ExpressionConverter
         if (domain.isAll()) {
             return Expressions.alwaysTrue();
         }
-        else if (domain.isNone()) {
-            return Expressions.alwaysFalse();
+        if (domain.getValues().isNone()) {
+            return domain.isNullAllowed() ? Expressions.isNull(columnName) : Expressions.alwaysFalse();
         }
-        else if (domain.isOnlyNull()) {
-            return Expressions.isNull(columnName);
-        }
-        else {
-            ValueSet domainValues = domain.getValues();
-            Expression expression = null;
-            if (domain.isNullAllowed()) {
-                expression = Expressions.isNull(columnName);
-            }
 
-            if (domainValues instanceof EquatableValueSet) {
-                expression = (expression == null ? Expressions.alwaysFalse() : expression);
-                if (((EquatableValueSet) domainValues).isWhiteList()) {
-                    // if whitelist is true than this is a case of "in", otherwise this is a case of "not in".
-                    return or(expression, equal(columnName, ((EquatableValueSet) domainValues).getValues()));
-                }
-                else {
-                    return or(expression, Expressions.notEqual(columnName, ((EquatableValueSet) domainValues).getValues()));
-                }
+        if (domain.getValues().isAll()) {
+            return domain.isNullAllowed() ? Expressions.alwaysTrue() : Expressions.not(Expressions.isNull(columnName));
+        }
+
+        final ValueSet domainValues = domain.getValues();
+        Expression expression = null;
+        if (domain.isNullAllowed()) {
+            expression = Expressions.isNull(columnName);
+        }
+
+        if (domainValues instanceof EquatableValueSet) {
+            expression = (expression == null ? Expressions.alwaysFalse() : expression);
+            if (((EquatableValueSet) domainValues).isWhiteList()) {
+                // if whitelist is true than this is a case of "in", otherwise this is a case of "not in".
+                return or(expression, equal(columnName, ((EquatableValueSet) domainValues).getValues()));
             }
             else {
-                if (domainValues instanceof SortedRangeSet) {
-                    List<Range> orderedRanges = ((SortedRangeSet) domainValues).getOrderedRanges();
-                    expression = (expression == null ? Expressions.alwaysFalse() : expression);
-                    for (Range range : orderedRanges) {
-                        Marker low = range.getLow();
-                        Marker high = range.getHigh();
-                        Marker.Bound lowBound = low.getBound();
-                        Marker.Bound highBound = high.getBound();
+                return or(expression, Expressions.notEqual(columnName, ((EquatableValueSet) domainValues).getValues()));
+            }
+        }
+        else {
+            if (domainValues instanceof SortedRangeSet) {
+                final List<Range> orderedRanges = ((SortedRangeSet) domainValues).getOrderedRanges();
+                expression = (expression == null ? Expressions.alwaysFalse() : expression);
+                for (Range range : orderedRanges) {
+                    final Marker low = range.getLow();
+                    final Marker high = range.getHigh();
+                    final Marker.Bound lowBound = low.getBound();
+                    final Marker.Bound highBound = high.getBound();
 
-                        // case col <> 'val' is represented as (col < 'val' or col > 'val')
-                        if (lowBound.equals(EXACTLY) && highBound.equals(EXACTLY)) {
-                            // case ==
-                            if (getValue(column, low, session).equals(getValue(column, high, session))) {
-                                expression = or(expression, equal(columnName, getValue(column, low, session)));
-                            }
-                            else { // case between
-                                final Expression between = and(greaterThanOrEqual(columnName, getValue(column, low, session)), lessThanOrEqual(columnName, getValue(column, high, session)));
-                                expression = or(expression, between);
-                            }
+                    // case col <> 'val' is represented as (col < 'val' or col > 'val')
+                    if (lowBound.equals(EXACTLY) && highBound.equals(EXACTLY)) {
+                        // case ==
+                        if (getValue(column, low, session).equals(getValue(column, high, session))) {
+                            expression = or(expression, equal(columnName, getValue(column, low, session)));
                         }
-                        else {
-                            if (lowBound.equals(EXACTLY) && low.getValueBlock().isPresent()) {
-                                // case >=
-                                expression = or(expression, greaterThanOrEqual(columnName, getValue(column, low, session)));
-                            }
-                            else if (lowBound.equals(ABOVE) && low.getValueBlock().isPresent()) {
-                                // case >
-                                expression = or(expression, greaterThan(columnName, getValue(column, low, session)));
-                            }
+                        else { // case between
+                            final Expression between = and(greaterThanOrEqual(columnName, getValue(column, low, session)), lessThanOrEqual(columnName, getValue(column, high, session)));
+                            expression = or(expression, between);
+                        }
+                    }
+                    else {
+                        if (lowBound.equals(EXACTLY) && low.getValueBlock().isPresent()) {
+                            // case >=
+                            expression = or(expression, greaterThanOrEqual(columnName, getValue(column, low, session)));
+                        }
+                        else if (lowBound.equals(ABOVE) && low.getValueBlock().isPresent()) {
+                            // case >
+                            expression = or(expression, greaterThan(columnName, getValue(column, low, session)));
+                        }
 
-                            if (highBound.equals(EXACTLY) && high.getValueBlock().isPresent()) {
-                                // case <=
-                                expression = or(expression, lessThanOrEqual(columnName, getValue(column, high, session)));
-                            }
-                            else if (highBound.equals(BELOW) && high.getValueBlock().isPresent()) {
-                                // case <
-                                expression = or(expression, lessThan(columnName, getValue(column, high, session)));
-                            }
+                        if (highBound.equals(EXACTLY) && high.getValueBlock().isPresent()) {
+                            // case <=
+                            expression = or(expression, lessThanOrEqual(columnName, getValue(column, high, session)));
+                        }
+                        else if (highBound.equals(BELOW) && high.getValueBlock().isPresent()) {
+                            // case <
+                            expression = or(expression, lessThan(columnName, getValue(column, high, session)));
                         }
                     }
                 }
-                else {
-                    throw new IllegalStateException("Did not expect a domain value set other than SortedRangeSet and EquatableValueSet but got " + domainValues.getClass().getSimpleName());
-                }
             }
-            return expression;
+            else {
+                throw new IllegalStateException("Did not expect a domain value set other than SortedRangeSet and EquatableValueSet but got " + domainValues.getClass().getSimpleName());
+            }
         }
+        return expression;
     }
 
     private static Object getValue(HiveColumnHandle columnHandle, Marker marker, ConnectorSession session)
