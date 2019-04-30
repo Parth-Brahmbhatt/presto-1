@@ -46,6 +46,7 @@ import org.apache.iceberg.parquet.TypeToMessageType;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -82,9 +83,7 @@ public class IcebergPageSink
     private Configuration configuration;
     private List<HiveColumnHandle> inputColumns;
     private List<HiveColumnHandle> partitionColumns;
-    private Map<String, PartitionWriteContext> partitionToWriterContext;
-    private Map<String, String> partitionToFile;
-    private Map<String, PartitionData> partitionToPartitionData;
+    private Map<String, WriteContext> pathToWriter;
     private JsonCodec<CommitTaskData> jsonCodec;
     private final ConnectorSession session;
     private final TypeManager typeManager;
@@ -100,7 +99,8 @@ public class IcebergPageSink
             List<HiveColumnHandle> inputColumns,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> jsonCodec,
-            ConnectorSession session, FileFormat fileFormat)
+            ConnectorSession session,
+            FileFormat fileFormat)
     {
         this.outputSchema = outputSchema;
         this.partitionSpec = partitionSpec;
@@ -113,9 +113,7 @@ public class IcebergPageSink
         this.session = session;
         this.typeManager = typeManager;
         this.fileFormat = fileFormat;
-        this.partitionToWriterContext = new ConcurrentHashMap<>();
-        this.partitionToFile = new ConcurrentHashMap<>();
-        this.partitionToPartitionData = new ConcurrentHashMap<>();
+        this.pathToWriter = new ConcurrentHashMap<>();
         this.partitionTypes = partitionColumns.stream().map(col -> typeManager.getType(col.getTypeSignature())).collect(toList());
         this.inputColumns = inputColumns;
         this.isNullable = outputSchema.columns().stream().map(column -> column.isOptional()).collect(toList());
@@ -125,21 +123,30 @@ public class IcebergPageSink
     public CompletableFuture<?> appendPage(Page page)
     {
         int numRows = page.getPositionCount();
+        Map<String, List<Integer>> partitionToPageRowNumber = new HashMap<>();
 
         for (int rowNum = 0; rowNum < numRows; rowNum++) {
             PartitionData partitionData = getPartitionData(session, page, rowNum);
             String partitionPath = partitionSpec.partitionToPath(partitionData);
 
-            if (!partitionToWriterContext.containsKey(partitionPath)) {
-                partitionToWriterContext.put(partitionPath, new PartitionWriteContext(new ArrayList<>(), addWriter(partitionPath)));
-                partitionToPartitionData.put(partitionPath, partitionData);
+            // TODO check if we really need to make this thread safe.
+            if (!pathToWriter.containsKey(partitionPath)) {
+                synchronized (pathToWriter) {
+                    if (!pathToWriter.containsKey(partitionPath)) {
+                        addWriter(partitionPath, partitionData);
+                    }
+                }
             }
-            partitionToWriterContext.get(partitionPath).getRowNum().add(rowNum);
+
+            if (partitionToPageRowNumber.get(partitionPath) == null) {
+                partitionToPageRowNumber.put(partitionPath, new ArrayList<>());
+            }
+            partitionToPageRowNumber.get(partitionPath).add(rowNum);
         }
 
-        for (Map.Entry<String, PartitionWriteContext> partitionToWriter : partitionToWriterContext.entrySet()) {
-            List<Integer> rowNums = partitionToWriter.getValue().getRowNum();
-            FileAppender<Page> writer = partitionToWriter.getValue().getWriter();
+        for (Map.Entry<String, WriteContext> partitionToWriteContext : pathToWriter.entrySet()) {
+            final List<Integer> rowNums = partitionToPageRowNumber.get(partitionToWriteContext.getKey());
+            final FileAppender<Page> writer = partitionToWriteContext.getValue().writer();
             Page partition = page.getPositions(Ints.toArray(rowNums), 0, rowNums.size());
             writer.add(partition);
         }
@@ -153,9 +160,9 @@ public class IcebergPageSink
     public CompletableFuture<Collection<Slice>> finish()
     {
         Collection<Slice> commitTasks = new ArrayList<>();
-        for (String partition : partitionToFile.keySet()) {
-            String file = partitionToFile.get(partition);
-            FileAppender<Page> fileAppender = partitionToWriterContext.get(partition).getWriter();
+        for (WriteContext writeContext : pathToWriter.values()) {
+            String file = writeContext.fileLocation();
+            final FileAppender<Page> fileAppender = writeContext.writer();
             try {
                 fileAppender.close();
             }
@@ -164,8 +171,9 @@ public class IcebergPageSink
                 throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Failed to close" + file);
             }
             Metrics metrics = fileAppender.metrics();
-            String partitionDataJson = partitionToPartitionData.containsKey(partition) ? partitionToPartitionData.get(partition).toJson() : null;
-            commitTasks.add(Slices.wrappedBuffer(jsonCodec.toJsonBytes(new CommitTaskData(file, toJson(metrics), partition, partitionDataJson))));
+            PartitionData partitionValue = writeContext.partitionValue();
+            String partitionDataJson = partitionValue != null ? partitionValue.toJson() : null;
+            commitTasks.add(Slices.wrappedBuffer(jsonCodec.toJsonBytes(new CommitTaskData(file, toJson(metrics), file, partitionDataJson))));
         }
 
         return CompletableFuture.completedFuture(commitTasks);
@@ -174,9 +182,9 @@ public class IcebergPageSink
     @Override
     public void abort()
     {
-        partitionToFile.values().stream().forEach(s -> {
+        pathToWriter.values().stream().forEach(writeContext -> {
             try {
-                new Path(s).getFileSystem(configuration).delete(new Path(s), false);
+                new Path(writeContext.fileLocation()).getFileSystem(configuration).delete(new Path(writeContext.fileLocation()), false);
             }
             catch (IOException e) {
                 throw new RuntimeIOException(e);
@@ -184,7 +192,7 @@ public class IcebergPageSink
         });
     }
 
-    private FileAppender<Page> addWriter(String partitionPath)
+    private void addWriter(String partitionPath, PartitionData partitionValue)
     {
         Path dataDir = new Path(outputDir);
         String pathUUId = randomUUID().toString(); // TODO add more context here instead of just random UUID, ip of the host, taskId
@@ -198,8 +206,7 @@ public class IcebergPageSink
                             .schema(outputSchema)
                             .writeSupport(new PrestoWriteSupport(inputColumns, typeToMessageType.convert(outputSchema, "presto_schema"), outputSchema, typeManager, session, isNullable))
                             .build();
-                    partitionToFile.put(partitionPath, outputFile.location());
-                    return writer;
+                    pathToWriter.put(partitionPath, new WriteContext(writer, outputFilePath, partitionValue));
                 }
                 catch (IOException e) {
                     throw new RuntimeIOException("Could not create writer ", e);
@@ -207,7 +214,7 @@ public class IcebergPageSink
             case ORC:
             case AVRO:
             default:
-                throw new UnsupportedOperationException("Only parquet is supported for iceberg as of now");
+                throw new UnsupportedOperationException("Only parquet is supported for iceberg as of now but got fileformat " + fileFormat);
         }
     }
 
@@ -278,6 +285,35 @@ public class IcebergPageSink
                 return type.getObjectValue(session, block, rownum);
             default:
                 throw new UnsupportedOperationException(type + " is not supported as partition column");
+        }
+    }
+
+    private class WriteContext
+    {
+        private final FileAppender<Page> writer;
+        private final String fileLocation;
+        private final PartitionData partitionValue;
+
+        public WriteContext(FileAppender<Page> writer, String fileLocation, PartitionData partitionValue)
+        {
+            this.writer = writer;
+            this.fileLocation = fileLocation;
+            this.partitionValue = partitionValue;
+        }
+
+        public FileAppender<Page> writer()
+        {
+            return writer;
+        }
+
+        public String fileLocation()
+        {
+            return fileLocation;
+        }
+
+        public PartitionData partitionValue()
+        {
+            return partitionValue;
         }
     }
 }
