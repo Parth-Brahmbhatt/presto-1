@@ -13,6 +13,7 @@
  */
 package io.prestosql.iceberg;
 
+import com.facebook.presto.iceberg.IcebergInputInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.JsonCodec;
@@ -406,8 +407,8 @@ public class IcebergMetadata
     @Override
     public Optional<Object> getInfo(ConnectorTableLayoutHandle layoutHandle)
     {
-        // TODO this is passed to event stream so we may get wrong metrics if this does not have correct info
-        return Optional.empty();
+        IcebergTableLayoutHandle tableLayoutHandle = (IcebergTableLayoutHandle) layoutHandle;
+        return Optional.of(new IcebergInputInfo(tableLayoutHandle.getDatabase(), tableLayoutHandle.getTableName(), tableLayoutHandle.getAtId()));
     }
 
     @Override
