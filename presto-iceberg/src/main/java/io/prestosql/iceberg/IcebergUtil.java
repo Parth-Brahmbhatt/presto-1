@@ -39,7 +39,6 @@ import org.apache.iceberg.types.Types;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -51,8 +50,6 @@ import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static java.util.stream.Collectors.toMap;
-import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
-import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
 
 class IcebergUtil
 {
@@ -140,9 +137,11 @@ class IcebergUtil
 
     public FileFormat getFileFormat(Table table)
     {
-        return FileFormat.valueOf(table.properties()
-                .getOrDefault(DEFAULT_FILE_FORMAT, DEFAULT_FILE_FORMAT_DEFAULT)
-                .toUpperCase(Locale.ENGLISH));
+        // TODO return the actual format when we support non parquet.
+//        return FileFormat.valueOf(table.properties()
+//                .getOrDefault(DEFAULT_FILE_FORMAT, DEFAULT_FILE_FORMAT_DEFAULT)
+//                .toUpperCase(Locale.ENGLISH));
+        return FileFormat.PARQUET;
     }
 
     public final TableScan getTableScan(ConnectorSession session, TupleDomain<HiveColumnHandle> predicates, Long id, Table icebergTable)
