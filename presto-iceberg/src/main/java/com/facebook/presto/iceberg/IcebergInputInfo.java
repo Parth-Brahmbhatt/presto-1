@@ -19,9 +19,9 @@ public class IcebergInputInfo
 {
     private String database;
     private String tableName;
-    private long atId;
+    private Long atId;
 
-    public IcebergInputInfo(@JsonProperty("database") String database, @JsonProperty("tableName") String tableName, @JsonProperty("atId") long atId)
+    public IcebergInputInfo(@JsonProperty("database") String database, @JsonProperty("tableName") String tableName, @JsonProperty("atId") Long atId)
     {
         this.database = database;
         this.tableName = tableName;
@@ -41,7 +41,7 @@ public class IcebergInputInfo
     }
 
     @JsonProperty
-    public long getAtId()
+    public Long getAtId()
     {
         return atId;
     }
