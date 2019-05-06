@@ -272,7 +272,7 @@ public class PartitionTable
 
     private final TableScan getTableScan(TupleDomain<Integer> constraint)
     {
-        List<HiveColumnHandle> partitionColumns = icebergUtil.getColumns(icebergTable.schema(), icebergTable.spec(), typeManager);
+        List<HiveColumnHandle> partitionColumns = icebergUtil.getPartitionColumns(icebergTable.schema(), icebergTable.spec(), typeManager);
         Map<Integer, HiveColumnHandle> fieldIdToColumnHandle = IntStream.range(0, partitionColumnTypes.size())
                 .boxed()
                 .collect(Collectors.toMap(identity(), partitionColumns::get));

@@ -38,6 +38,7 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -108,6 +109,24 @@ class IcebergUtil
         return builder.build();
     }
 
+    public final List<HiveColumnHandle> getPartitionColumns(Schema schema, PartitionSpec spec, TypeManager typeManager)
+    {
+        int columnIndex = 0;
+        ImmutableList.Builder builder = ImmutableList.builder();
+        final List<PartitionField> partitionFields = getIdentityPartitions(spec).entrySet().stream().map(e -> e.getKey()).collect(Collectors.toList());
+
+        for (PartitionField partitionField : partitionFields) {
+            Type sourceType = schema.findType(partitionField.sourceId());
+            Type type = partitionField.transform().getResultType(sourceType);
+            HiveColumnHandle.ColumnType columnType = PARTITION_KEY;
+            final io.prestosql.spi.type.Type prestoType = TypeConveter.convert(type, typeManager);
+            final HiveType hiveType = HiveType.toHiveType(hiveTypeTranslator, coerceForHive(prestoType));
+            final HiveColumnHandle columnHandle = new HiveColumnHandle(partitionField.name(), hiveType, prestoType.getTypeSignature(), columnIndex++, columnType, Optional.empty());
+            builder.add(columnHandle);
+        }
+        return builder.build();
+    }
+
     public io.prestosql.spi.type.Type coerceForHive(io.prestosql.spi.type.Type prestoType)
     {
         if (prestoType.equals(TIMESTAMP_WITH_TIME_ZONE)) {
@@ -123,11 +142,13 @@ class IcebergUtil
         // Need to make changes to iceberg so we can identify transform in a better way.
         return IntStream.range(0, partitionSpec.fields().size())
                 .boxed()
-                .collect(toMap(partitionSpec.fields()::get, i -> i))
+                .collect(toMap(partitionSpec.fields()::get, i -> i, (e1, e2) -> e1,
+                        LinkedHashMap::new))
                 .entrySet()
                 .stream()
                 .filter(e -> e.getKey().transform().toString().equals("identity"))
-                .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
+                .collect(toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1,
+                        LinkedHashMap::new));
     }
 
     public String getDataPath(String icebergLocation)
