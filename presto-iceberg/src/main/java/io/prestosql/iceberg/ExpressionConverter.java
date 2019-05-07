@@ -139,11 +139,21 @@ public class ExpressionConverter
 
                         if (highBound.equals(EXACTLY) && high.getValueBlock().isPresent()) {
                             // case <=
-                            expression = or(expression, lessThanOrEqual(columnName, getValue(column, high, session)));
+                            if (low.getValueBlock().isPresent()) {
+                                expression = and(expression, lessThanOrEqual(columnName, getValue(column, high, session)));
+                            }
+                            else {
+                                expression = or(expression, lessThanOrEqual(columnName, getValue(column, high, session)));
+                            }
                         }
                         else if (highBound.equals(BELOW) && high.getValueBlock().isPresent()) {
                             // case <
-                            expression = or(expression, lessThan(columnName, getValue(column, high, session)));
+                            if (low.getValueBlock().isPresent()) {
+                                expression = and(expression, lessThan(columnName, getValue(column, high, session)));
+                            }
+                            else {
+                                expression = or(expression, lessThan(columnName, getValue(column, high, session)));
+                            }
                         }
                     }
                 }
