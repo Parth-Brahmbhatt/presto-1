@@ -263,7 +263,12 @@ public class QueryStateMachine
                 metadata,
                 warningCollector,
                 queryType);
-        queryStateMachine.addStateChangeListener(newState -> QUERY_STATE_LOG.debug("Query %s is %s", queryStateMachine.getQueryId(), newState));
+        queryStateMachine.addStateChangeListener(newState -> {
+            QUERY_STATE_LOG.debug("Query %s is %s", queryStateMachine.getQueryId(), newState);
+            if (newState == PLANNING) {
+                QUERY_STATE_LOG.debug("Query %s text: %s", queryStateMachine.getQueryId(), query.replaceAll("[\\n\\t\\r]", " "));
+            }
+        });
 
         return queryStateMachine;
     }
