@@ -65,6 +65,7 @@ import java.util.stream.IntStream;
 
 import static io.prestosql.iceberg.IcebergUtil.getIdentityPartitions;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DateTimeEncoding.packDateTimeWithZone;
 import static java.util.function.Function.identity;
 
 public class PartitionTable
@@ -159,6 +160,7 @@ public class PartitionTable
     @Override
     public RecordCursor cursor(ConnectorTransactionHandle transactionHandle, ConnectorSession session, TupleDomain<Integer> constraint)
     {
+        // TODO instead of cursor use pageSource method.
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(connectorClassLoader);
@@ -178,9 +180,9 @@ public class PartitionTable
 
         try (CloseableIterable<FileScanTask> fileScanTasks = tableScan.planFiles()) {
             for (FileScanTask fileScanTask : fileScanTasks) {
-                final DataFile dataFile = fileScanTask.file();
-                final StructLike partitionStruct = dataFile.partition();
-                final StructLikeWrapper partitionWrapper = StructLikeWrapper.wrap(partitionStruct);
+                DataFile dataFile = fileScanTask.file();
+                StructLike partitionStruct = dataFile.partition();
+                StructLikeWrapper partitionWrapper = StructLikeWrapper.wrap(partitionStruct);
                 if (!partitions.containsKey(partitionWrapper)) {
                     Partition partition = new Partition(partitionStruct,
                             dataFile.recordCount(),
@@ -202,6 +204,7 @@ public class PartitionTable
             }
         }
         catch (IOException e) {
+            // Add Iceberg error codes for all iceberg errors.
             new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, e);
         }
         return partitions;
@@ -209,7 +212,7 @@ public class PartitionTable
 
     private final RecordCursor buildRecordCursor(Map<StructLikeWrapper, Partition> partitions, List<PartitionField> partitionFields)
     {
-        final ImmutableList.Builder<List<Object>> records = new ImmutableList.Builder();
+        ImmutableList.Builder<List<Object>> records = new ImmutableList.Builder();
         List<Type> partitionTypes = partitionTypes(partitionFields);
         List<? extends Class<?>> partitionColumnClass = partitionTypes.stream().map(type -> type.typeId().javaClass()).collect(Collectors.toList());
         int columnCounts = partitionColumnTypes.size() + 3 + columnMetricTypes.size();
@@ -303,10 +306,10 @@ public class PartitionTable
             return buffer.array();
         }
         else if (type instanceof Types.TimestampType) {
-            final long utcMillis = TimeUnit.MICROSECONDS.toMillis((Long) value);
+            long utcMillis = TimeUnit.MICROSECONDS.toMillis((Long) value);
             Types.TimestampType timestampType = (Types.TimestampType) type;
             if (timestampType.shouldAdjustToUTC()) {
-                return DateTimeEncoding.packDateTimeWithZone(utcMillis, TimeZoneKey.UTC_KEY);
+                return packDateTimeWithZone(utcMillis, TimeZoneKey.UTC_KEY);
             }
             else {
                 return utcMillis;
@@ -447,7 +450,7 @@ public class PartitionTable
         public void updateNullCount(Map<Integer, Long> nullCounts)
         {
             for (Map.Entry<Integer, Long> entry : nullCounts.entrySet()) {
-                final Long nullCount = this.nullCounts.getOrDefault(entry.getKey(), 0L);
+                Long nullCount = this.nullCounts.getOrDefault(entry.getKey(), 0L);
                 this.nullCounts.put(entry.getKey(), entry.getValue() + nullCount);
             }
         }

@@ -4,7 +4,7 @@ This plugin allows presto to interact with [iceberg][iceberg]  tables.
 
 ## Status
 
-Currently this plugin supports create, CTAS, drop and reading from iceberg table. It also supports rename table, schema changes (add/remode/rename columns) and
+Currently this plugin supports create, CTAS, drop, delete and reading from iceberg table. It also supports rename table, schema changes (add/remode/rename columns) and
 read after the schema updates.
 
 ## How to configure
@@ -53,15 +53,18 @@ to add,drop and rename columns without any issues.
 This plugin can read/write to hive tables that have been migrated to iceberg. Currently there is no presto support to migrate hive
 tables to presto so you will either need to use icerberg API or use spark.
 
-## Hidden columns
+## $partitions
+This plugin supports $partitions as a substitute for hive's `show partitions` the only different it also returns
+some partition metrics for each partition value and you can also use this for unpartitioned tables.
+
+
+
 Iceberg supports $snapshot_id and $snapshot_timestamp_ms as hidden columns. These columns allows users to query an old version of
 the table, think of this as a time travel feature which lets you query your table's snapshot at a given time.
 
-In addition it also supports $partitions as a substitute for hive's `show partitions` the only different it also returns
-some partition metrics for each partition value.
+
 
 ## Still to do
-Support for delete from.
 Support for hidden partitioning, i.e. non identity partitioning columns.
 Support for time type.
 Bucketing support.
@@ -69,8 +72,7 @@ Iceberg table properties.
 Create table like support.
 Support for column level comments.
 Remove dependency on presto-hive plugin , extract the metastore classes and security module out.
-Explore if we can support/extend presto sql dialect so users can have "migrate table", "rollback table to snapshot" equivalents in presto.
-Either support a session property like hive to allow users to overwrite or look into other sql standard like `Merge` to support overwrite.
+support for "migrate table", "rollback table to snapshot" equivalents in presto using procedures.
 Return table statistics so CBO can leverage it.
 
 

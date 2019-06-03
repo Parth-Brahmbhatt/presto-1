@@ -89,7 +89,7 @@ public class MetricsParser
     {
         Map<Integer, V> map = new HashMap();
         for (JsonNode jsonNode : arrayNode) {
-            final int key = jsonNode.get(KEY).intValue();
+            int key = jsonNode.get(KEY).intValue();
             if (clazz.equals(ByteBuffer.class)) {
                 map.put(key, (V) ByteBuffer.wrap(jsonNode.get(VALUE).binaryValue()));
             }
@@ -106,13 +106,13 @@ public class MetricsParser
     public static Metrics fromJson(String json)
     {
         try {
-            final JsonNode jsonNode = JsonUtil.mapper().readTree(json);
-            final Map<Integer, Long> columnSizes = readMap(jsonNode.get(COLUMN_SIZES), Long.class);
-            final Map<Integer, Long> nullValueCounts = readMap(jsonNode.get(NULL_VALUE_COUNTS), Long.class);
-            final Map<Integer, Long> valueCounts = readMap(jsonNode.get(VALUE_COUNTS), Long.class);
-            final Long recordCount = jsonNode.get(RECORD_COUNT).asLong();
-            final Map<Integer, ByteBuffer> lowerBounds = readMap(jsonNode.get(LOWER_BOUNDS), ByteBuffer.class);
-            final Map<Integer, ByteBuffer> upperBounds = readMap(jsonNode.get(UPPER_BOUNDS), ByteBuffer.class);
+            JsonNode jsonNode = JsonUtil.mapper().readTree(json);
+            Map<Integer, Long> columnSizes = readMap(jsonNode.get(COLUMN_SIZES), Long.class);
+            Map<Integer, Long> nullValueCounts = readMap(jsonNode.get(NULL_VALUE_COUNTS), Long.class);
+            Map<Integer, Long> valueCounts = readMap(jsonNode.get(VALUE_COUNTS), Long.class);
+            Long recordCount = jsonNode.get(RECORD_COUNT).asLong();
+            Map<Integer, ByteBuffer> lowerBounds = readMap(jsonNode.get(LOWER_BOUNDS), ByteBuffer.class);
+            Map<Integer, ByteBuffer> upperBounds = readMap(jsonNode.get(UPPER_BOUNDS), ByteBuffer.class);
             return new Metrics(recordCount, columnSizes, valueCounts, nullValueCounts, lowerBounds, upperBounds);
         }
         catch (IOException e) {

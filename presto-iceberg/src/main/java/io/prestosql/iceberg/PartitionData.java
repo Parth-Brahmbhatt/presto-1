@@ -79,7 +79,7 @@ public class PartitionData
             generator.writeStartObject();
             generator.writeArrayFieldStart(PARTITON_VALUED_FIELD);
             for (int i = 0; i < this.partitionValues.length; i++) {
-                final Object value = this.partitionValues[i];
+                Object value = this.partitionValues[i];
                 if (value == null) {
                     generator.writeNull();
                 }
@@ -103,7 +103,7 @@ public class PartitionData
             return null;
         }
 
-        final JsonNode jsonNode;
+        JsonNode jsonNode;
         try {
             jsonNode = MAPPER.readTree(partitionDataAsJson);
         }
@@ -114,7 +114,7 @@ public class PartitionData
             return null;
         }
 
-        final JsonNode partitionValues = jsonNode.get(PARTITON_VALUED_FIELD);
+        JsonNode partitionValues = jsonNode.get(PARTITON_VALUED_FIELD);
         Object[] objects = new Object[types.length];
         int index = 0;
         for (JsonNode partitionValue : partitionValues) {

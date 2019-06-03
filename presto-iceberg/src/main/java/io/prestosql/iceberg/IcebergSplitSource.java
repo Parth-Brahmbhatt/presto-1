@@ -100,7 +100,8 @@ public class IcebergSplitSource
     public CompletableFuture<ConnectorSplitBatch> getNextBatch(ConnectorPartitionHandle partitionHandle, int maxSize)
     {
         List<ConnectorSplit> splits = new ArrayList<>();
-        final TupleDomain<HiveColumnHandle> predicates = DomainConverter.handleTypeDifference(this.predicates);
+        TupleDomain<HiveColumnHandle> predicates = DomainConverter.handleTypeDifference(this.predicates);
+        // TODO Guava iterators.limit
         while (scanTaskIterator.hasNext() && maxSize != 0) {
             CombinedScanTask combinedScanTask = scanTaskIterator.next();
             for (FileScanTask scanTask : combinedScanTask.files()) {
@@ -131,9 +132,9 @@ public class IcebergSplitSource
 
     private List<HivePartitionKey> getPartitionKeys(FileScanTask scanTask)
     {
-        final StructLike partition = scanTask.file().partition();
-        final PartitionSpec spec = scanTask.spec();
-        final Map<PartitionField, Integer> fieldToIndex = getIdentityPartitions(spec);
+        StructLike partition = scanTask.file().partition();
+        PartitionSpec spec = scanTask.spec();
+        Map<PartitionField, Integer> fieldToIndex = getIdentityPartitions(spec);
         List<HivePartitionKey> partitionKeys = new ArrayList<>();
 
         for (Map.Entry<PartitionField, Integer> entry : fieldToIndex.entrySet()) {
@@ -149,13 +150,13 @@ public class IcebergSplitSource
                 switch (partitionType.typeId()) {
                     case DATE:
                         Instant instant = Instant.EPOCH.plus((Integer) value, ChronoUnit.DAYS);
-                        final ZonedDateTime date = ZonedDateTime.ofInstant(instant, ZoneId.of("UTC"));
-                        final DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                        ZonedDateTime date = ZonedDateTime.ofInstant(instant, ZoneId.of("UTC"));
+                        DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
                         partitionValue = df.format(date);
                         break;
                     case TIMESTAMP:
-                        final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
-                        final long millis = TimeUnit.MICROSECONDS.toMillis((Long) value);
+                        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+                        long millis = TimeUnit.MICROSECONDS.toMillis((Long) value);
                         partitionValue = dateTimeFormatter.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.of("UTC")));
                         break;
                     case FIXED:
@@ -179,8 +180,8 @@ public class IcebergSplitSource
         implementation which ends up calling getFileStatus() method. The getFileStatus() call is delegated to underlying PrestoS3FileSystem which results in a
         s3 call slowing down the planning process significantly.
         try {
-            final Path hadoopPath = new Path(path);
-            final BlockLocation[] blocks = hdfsEnvironment.getFileSystem(hdfsContext, hadoopPath).getFileBlockLocations(hadoopPath, start, length);
+            Path hadoopPath = new Path(path);
+            BlockLocation[] blocks = hdfsEnvironment.getFileSystem(hdfsContext, hadoopPath).getFileBlockLocations(hadoopPath, start, length);
             return Arrays.stream(blocks[0].getHosts()).map(h -> HostAddress.fromString(h)).collect(Collectors.toList());
         }
         catch (IOException e) {
