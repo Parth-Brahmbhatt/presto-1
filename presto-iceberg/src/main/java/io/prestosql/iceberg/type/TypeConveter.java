@@ -163,9 +163,9 @@ public class TypeConveter
 
     private static org.apache.iceberg.types.Type handle(RowType type)
     {
-        final List<RowType.Field> fields = type.getFields();
+        List<RowType.Field> fields = type.getFields();
         // TODO 1 needs to be an incremented ID and field.getName() is optional so we need to throw an exception if it has no value.
-        final List<Types.NestedField> icebergRowFields = fields.stream().map(field -> Types.NestedField.required(1, field.getName().get(), convert(field.getType()))).collect(Collectors.toList());
+        List<Types.NestedField> icebergRowFields = fields.stream().map(field -> Types.NestedField.required(1, field.getName().get(), convert(field.getType()))).collect(Collectors.toList());
         return Types.StructType.of(icebergRowFields);
     }
 

@@ -165,7 +165,7 @@ public class ExpressionConverter
             return TimeUnit.MILLISECONDS.toMicros((Long) marker.getValue());
         }
         else if (base.equals(VARCHAR)) {
-            return marker.getPrintableValue(session);
+            return ((Slice) marker.getValue()).toStringUtf8();
         }
         else if (base.equals(VARBINARY)) {
             return ((Slice) marker.getValue()).getBytes();

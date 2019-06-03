@@ -53,6 +53,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.prestosql.iceberg.MetricsParser.toJson;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
+import static io.prestosql.spi.type.DateTimeEncoding.unpackMillisUtc;
 import static io.prestosql.spi.type.StandardTypes.BIGINT;
 import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.DATE;
@@ -145,6 +146,8 @@ public class IcebergPageSink
 
         return NOT_BLOCKED;
     }
+
+    // implement getCompletedBytes, see ParquetRecordWriterUtil
 
     @Override
     public CompletableFuture<Collection<Slice>> finish()
@@ -247,7 +250,7 @@ public class IcebergPageSink
     {
         if (block.isNull(rownum)) {
             return null;
-        }
+        } // remove usage of getObjectValue use the actual getTYPE call.
         switch (type.getTypeSignature().getBase()) {
             case BIGINT:
                 return type.getLong(block, rownum);
@@ -268,7 +271,7 @@ public class IcebergPageSink
             case TIMESTAMP:
                 return MILLISECONDS.toMicros(type.getLong(block, rownum));
             case TIMESTAMP_WITH_TIME_ZONE:
-                return MILLISECONDS.toMicros(DateTimeEncoding.unpackMillisUtc(type.getLong(block, rownum)));
+                return MILLISECONDS.toMicros(unpackMillisUtc(type.getLong(block, rownum)));
             case VARBINARY:
                 return ((SqlVarbinary) type.getObjectValue(session, block, rownum)).getBytes();
             case VARCHAR:

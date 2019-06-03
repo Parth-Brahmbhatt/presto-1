@@ -69,7 +69,7 @@ class IcebergUtil
 
     public final boolean isIcebergTable(io.prestosql.plugin.hive.metastore.Table table)
     {
-        final Map<String, String> parameters = table.getParameters();
+        Map<String, String> parameters = table.getParameters();
         return parameters != null && !parameters.isEmpty() && ICEBERG_PROPERTY_VALUE.equalsIgnoreCase(parameters.get(ICEBERG_PROPERTY_NAME));
     }
 
@@ -85,11 +85,11 @@ class IcebergUtil
 
     public List<HiveColumnHandle> getColumns(Schema schema, PartitionSpec spec, TypeManager typeManager)
     {
-        final List<Types.NestedField> columns = schema.columns();
+        List<Types.NestedField> columns = schema.columns();
         int columnIndex = 0;
         ImmutableList.Builder builder = ImmutableList.builder();
-        final List<PartitionField> partitionFields = getIdentityPartitions(spec).entrySet().stream().map(e -> e.getKey()).collect(Collectors.toList());
-        final Map<String, PartitionField> partitionColumnNames = partitionFields.stream().collect(toMap(PartitionField::name, Function.identity()));
+        List<PartitionField> partitionFields = getIdentityPartitions(spec).entrySet().stream().map(e -> e.getKey()).collect(Collectors.toList());
+        Map<String, PartitionField> partitionColumnNames = partitionFields.stream().collect(toMap(PartitionField::name, Function.identity()));
         // Iceberg may or may not store identity columns in data file and the identity transformations have the same name as data column.
         // So we remove the identity columns from the set of regular columns which does not work with some of presto validation.
 
@@ -97,7 +97,7 @@ class IcebergUtil
             Type type = column.type();
             HiveColumnHandle.ColumnType columnType = REGULAR;
             if (partitionColumnNames.containsKey(column.name())) {
-                final PartitionField partitionField = partitionColumnNames.get(column.name());
+                PartitionField partitionField = partitionColumnNames.get(column.name());
                 Type sourceType = schema.findType(partitionField.sourceId());
                 type = partitionField.transform().getResultType(sourceType);
                 columnType = PARTITION_KEY;
@@ -147,7 +147,7 @@ class IcebergUtil
 
     public final TableScan getTableScan(ConnectorSession session, TupleDomain<HiveColumnHandle> predicates, Long id, Table icebergTable)
     {
-        final Expression expression = ExpressionConverter.toIceberg(predicates, session);
+        Expression expression = ExpressionConverter.toIceberg(predicates, session);
         TableScan tableScan = icebergTable.newScan().filter(expression);
         if (id != null) {
             if (isSnapshot(icebergTable, id)) {
@@ -178,7 +178,7 @@ class IcebergUtil
         }
 
         return predicates.getDomains().map(hiveColumnHandleDomainMap -> {
-            final List<Domain> snapShotDomains = hiveColumnHandleDomainMap.entrySet().stream()
+            List<Domain> snapShotDomains = hiveColumnHandleDomainMap.entrySet().stream()
                     .filter(hiveColumnHandleDomainEntry -> hiveColumnHandleDomainEntry.getKey().getName().equals(columnName))
                     .map(hiveColumnHandleDomainEntry -> hiveColumnHandleDomainEntry.getValue())
                     .collect(Collectors.toList());

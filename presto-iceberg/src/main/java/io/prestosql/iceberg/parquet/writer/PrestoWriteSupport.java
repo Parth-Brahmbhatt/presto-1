@@ -107,11 +107,11 @@ public class PrestoWriteSupport
     @Override
     public void write(Page page)
     {
-        final int numRows = page.getPositionCount();
+        int numRows = page.getPositionCount();
         for (int rowNum = 0; rowNum < numRows; rowNum++) {
             recordConsumer.startMessage();
             for (int columnIndex = 0; columnIndex < page.getChannelCount(); columnIndex++) {
-                final Block block = page.getBlock(columnIndex);
+                Block block = page.getBlock(columnIndex);
                 if (!block.isNull(rowNum)) {
                     consumeField(columns.get(columnIndex).getName(), columnIndex, writers.get(columnIndex), block, rowNum);
                 }
@@ -335,7 +335,7 @@ public class PrestoWriteSupport
         @Override
         public void write(Block block, int rownum)
         {
-            final List<Object> elements = (List<Object>) arrayType.getObjectValue(session, block, rownum);
+            List<Object> elements = (List<Object>) arrayType.getObjectValue(session, block, rownum);
             write(elements.toArray());
         }
 
@@ -424,7 +424,7 @@ public class PrestoWriteSupport
         {
             recordConsumer.startGroup();
             for (int i = 0; i < fields.size(); i++) {
-                final String name = rowType.getFields().get(i).getName().orElseThrow(() -> new IllegalArgumentException("parquet requires row type fields to have names"));
+                String name = rowType.getFields().get(i).getName().orElseThrow(() -> new IllegalArgumentException("parquet requires row type fields to have names"));
                 if (fields.get(i) != null) {
                     consumeField(name, i, columnWriters.get(i), fields.get(i));
                 }
@@ -464,7 +464,7 @@ public class PrestoWriteSupport
 
     private final ColumnWriter getWriter(Type type)
     {
-        final org.apache.iceberg.types.Type icebergType = TypeConveter.convert(type);
+        org.apache.iceberg.types.Type icebergType = TypeConveter.convert(type);
         if (writerMap.containsKey(icebergType.typeId())) {
             return writerMap.get(icebergType.typeId());
         }

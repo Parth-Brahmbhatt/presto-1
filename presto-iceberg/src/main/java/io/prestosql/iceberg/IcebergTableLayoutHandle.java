@@ -26,7 +26,7 @@ public class IcebergTableLayoutHandle
 {
     private final String database;
     private final String tableName;
-    private final Long atId;
+    private final Long atId; // Use Optional<Long>
     private final TupleDomain<HiveColumnHandle> predicates;
     private final Map<String, HiveColumnHandle> nameToColumnHandle;
 

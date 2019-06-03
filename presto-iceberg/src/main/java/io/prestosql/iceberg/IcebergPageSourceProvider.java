@@ -171,7 +171,6 @@ public class IcebergPageSourceProvider
 
             Map<String, HiveColumnHandle> parquetColumns = convertToParquetNames(columns, icebergNameToId, fileSchema);
 
-            // TODO may be move away from streams as this code is executed for each split and streams are known to be slow.
             List<org.apache.parquet.schema.Type> fields = parquetColumns.values().stream()
                     .filter(column -> column.getColumnType() == REGULAR)
                     .map(column -> getParquetType(column, fileSchema, true)) // we always use parquet column names in case of iceberg.

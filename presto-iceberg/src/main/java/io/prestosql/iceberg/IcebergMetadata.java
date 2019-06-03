@@ -96,6 +96,7 @@ public class IcebergMetadata
     private Transaction transaction;
     private IcebergUtil icebergUtil;
     private final LocationService locationService;
+    // Keep it threadsafe and make a table cache.
 
     IcebergMetadata(
             SemiTransactionalHiveMetastore metastore,
@@ -138,6 +139,7 @@ public class IcebergMetadata
     @Override
     public Optional<SystemTable> getSystemTable(ConnectorSession session, SchemaTableName tableName)
     {
+        //TODO move the parse outside and extract the type out from handle.
         IcebergTableHandle sourceTableHandle = IcebergTableHandle.parse(tableName.getTableName(), tableName.getSchemaName());
 
         if (sourceTableHandle.getTableType() == TableType.PARTITIONS) {
@@ -517,7 +519,7 @@ public class IcebergMetadata
         IcebergTableHandle handle = (IcebergTableHandle) tableHandle;
         IcebergTableLayoutHandle layoutHandle = (IcebergTableLayoutHandle) tableLayoutHandle;
 
-        final Configuration configuration = getConfiguration(session, handle.getSchemaName());
+        Configuration configuration = getConfiguration(session, handle.getSchemaName());
         org.apache.iceberg.Table icebergTable = icebergUtil.getIcebergTable(handle.getSchemaName(), handle.getTableName(), configuration);
         icebergTable.newDelete()
                 .deleteFromRowFilter(ExpressionConverter.toIceberg(layoutHandle.getPredicates(), session))
