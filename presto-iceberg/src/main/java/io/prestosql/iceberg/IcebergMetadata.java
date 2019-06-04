@@ -74,7 +74,6 @@ import java.util.stream.Collectors;
 
 import static io.prestosql.plugin.hive.HiveColumnHandle.updateRowIdHandle;
 import static io.prestosql.plugin.hive.HiveTableProperties.getPartitionedBy;
-import static io.prestosql.plugin.hive.HiveUtil.schemaTableName;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -153,7 +152,7 @@ public class IcebergMetadata
     @Override
     public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session,
             ConnectorTableHandle tbl,
-            Constraint<ColumnHandle> constraint,
+            Constraint constraint,
             Optional<Set<ColumnHandle>> desiredColumns)
     {
         IcebergTableHandle tableHandle = (IcebergTableHandle) tbl;
@@ -245,9 +244,9 @@ public class IcebergMetadata
     /**
      * Get statistics for table for given filtering constraint.
      */
-    @Override
-    public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint<ColumnHandle> constraint)
+    public TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
     {
+        // TODO This is needed for CBO
         return TableStatistics.empty();
     }
 
@@ -416,7 +415,7 @@ public class IcebergMetadata
         IcebergTableHandle handle = (IcebergTableHandle) tableHandle;
 
         if (!metastore.getTable(handle.getSchemaName(), handle.getTableName()).isPresent()) {
-            throw new TableNotFoundException(schemaTableName(tableHandle));
+            throw new TableNotFoundException(new SchemaTableName(handle.getSchemaName(), handle.getTableName()));
         }
         metastore.dropTable(session, handle.getSchemaName(), handle.getTableName());
     }

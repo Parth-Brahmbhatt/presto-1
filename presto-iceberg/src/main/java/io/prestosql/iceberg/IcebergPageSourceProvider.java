@@ -24,8 +24,8 @@ import io.prestosql.parquet.reader.MetadataReader;
 import io.prestosql.parquet.reader.ParquetReader;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HdfsEnvironment;
-import io.prestosql.plugin.hive.HiveClientConfig;
 import io.prestosql.plugin.hive.HiveColumnHandle;
+import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HivePageSource;
 import io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMapping;
 import io.prestosql.plugin.hive.HivePartitionKey;
@@ -89,18 +89,18 @@ public class IcebergPageSourceProvider
 {
     private final HdfsEnvironment hdfsEnvironment;
     private final TypeManager typeManager;
-    private final HiveClientConfig hiveClientConfig;
+    private final HiveConfig hiveConfig;
     private FileFormatDataSourceStats fileFormatDataSourceStats;
 
     @Inject
     public IcebergPageSourceProvider(
-            HiveClientConfig hiveClientConfig,
+            HiveConfig hiveConfig,
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
             FileFormatDataSourceStats fileFormatDataSourceStats)
     {
-        requireNonNull(hiveClientConfig, "hiveClientConfig is null");
-        this.hiveClientConfig = hiveClientConfig;
+        requireNonNull(hiveConfig, "hiveConfig is null");
+        this.hiveConfig = hiveConfig;
         this.hdfsEnvironment = hdfsEnvironment;
         this.typeManager = typeManager;
         this.fileFormatDataSourceStats = fileFormatDataSourceStats;
@@ -127,7 +127,7 @@ public class IcebergPageSourceProvider
                 length,
                 hiveColumns,
                 icebergSplit.getNameToId(),
-                hiveClientConfig.isUseParquetColumnNames(),
+                hiveConfig.isUseParquetColumnNames(),
                 typeManager,
                 getParquetMaxReadBlockSize(session),
                 isFailOnCorruptedParquetStatistics(session),

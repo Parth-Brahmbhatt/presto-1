@@ -18,19 +18,18 @@ import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
 import com.google.inject.multibindings.Multibinder;
+import io.prestosql.plugin.hive.CachingDirectoryLister;
 import io.prestosql.plugin.hive.CoercionPolicy;
 import io.prestosql.plugin.hive.DirectoryLister;
 import io.prestosql.plugin.hive.DynamicConfigurationProvider;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.ForCachingHiveMetastore;
-import io.prestosql.plugin.hive.ForHiveClient;
-import io.prestosql.plugin.hive.HadoopDirectoryLister;
+import io.prestosql.plugin.hive.ForHive;
 import io.prestosql.plugin.hive.HdfsConfiguration;
 import io.prestosql.plugin.hive.HdfsConfigurationInitializer;
 import io.prestosql.plugin.hive.HdfsEnvironment;
-import io.prestosql.plugin.hive.HiveClientConfig;
 import io.prestosql.plugin.hive.HiveCoercionPolicy;
-import io.prestosql.plugin.hive.HiveConnectorId;
+import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveFileWriterFactory;
 import io.prestosql.plugin.hive.HiveHdfsConfiguration;
 import io.prestosql.plugin.hive.HiveLocationService;
@@ -100,13 +99,12 @@ public class IcebergModule
     @Override
     public void configure(Binder binder)
     {
-        binder.bind(HiveConnectorId.class).toInstance(new HiveConnectorId(connectorId));
         binder.bind(TypeTranslator.class).toInstance(new HiveTypeTranslator());
         binder.bind(CoercionPolicy.class).to(HiveCoercionPolicy.class).in(Scopes.SINGLETON);
         binder.bind(HdfsConfiguration.class).to(HiveHdfsConfiguration.class).in(Scopes.SINGLETON);
         binder.bind(HdfsEnvironment.class).in(Scopes.SINGLETON);
-        binder.bind(DirectoryLister.class).to(HadoopDirectoryLister.class).in(Scopes.SINGLETON);
-        configBinder(binder).bindConfig(HiveClientConfig.class);
+        binder.bind(DirectoryLister.class).to(CachingDirectoryLister.class).in(Scopes.SINGLETON);
+        configBinder(binder).bindConfig(HiveConfig.class);
         configBinder(binder).bindConfig(HiveS3Config.class);
         binder.bind(HiveSessionProperties.class).in(Scopes.SINGLETON);
         binder.bind(HiveTableProperties.class).in(Scopes.SINGLETON);
@@ -146,12 +144,12 @@ public class IcebergModule
         fileWriterFactoryBinder.addBinding().to(RcFileFileWriterFactory.class).in(Scopes.SINGLETON);
     }
 
-    @ForHiveClient
+    @ForHive
     @Singleton
     @Provides
-    public ExecutorService createHiveClientExecutor(HiveConnectorId hiveClientId)
+    public ExecutorService createHiveClientExecutor()
     {
-        return newCachedThreadPool(daemonThreadsNamed("iceberg-" + hiveClientId + "-%s"));
+        return newCachedThreadPool(daemonThreadsNamed("iceberg-%s"));
     }
 
     @Singleton
@@ -164,7 +162,7 @@ public class IcebergModule
     @ForCachingHiveMetastore
     @Singleton
     @Provides
-    public ExecutorService createCachingHiveMetastoreExecutor(HiveClientConfig hiveClientConfig)
+    public ExecutorService createCachingHiveMetastoreExecutor(HiveConfig hiveClientConfig)
     {
         return newFixedThreadPool(
                 hiveClientConfig.getMaxMetastoreRefreshThreads(),

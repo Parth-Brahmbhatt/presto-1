@@ -16,22 +16,19 @@ package io.prestosql.iceberg;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Injector;
-import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.event.client.EventModule;
 import io.airlift.json.JsonModule;
+import io.prestosql.plugin.base.jmx.MBeanServerModule;
 import io.prestosql.plugin.hive.HiveSchemaProperties;
 import io.prestosql.plugin.hive.HiveSessionProperties;
 import io.prestosql.plugin.hive.HiveTableProperties;
 import io.prestosql.plugin.hive.HiveTransactionManager;
 import io.prestosql.plugin.hive.NodeVersion;
-import io.prestosql.plugin.hive.RebindSafeMBeanServer;
 import io.prestosql.plugin.hive.authentication.HiveAuthenticationModule;
-import io.prestosql.plugin.hive.metastore.ExtendedHiveMetastore;
+import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastoreModule;
-import io.prestosql.plugin.hive.metastore.thrift.HiveMetastore;
-import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastore;
 import io.prestosql.plugin.hive.s3.HiveS3Module;
 import io.prestosql.plugin.hive.security.HiveSecurityModule;
 import io.prestosql.spi.NodeManager;
@@ -52,9 +49,6 @@ import io.prestosql.spi.connector.classloader.ClassLoaderSafeNodePartitioningPro
 import io.prestosql.spi.type.TypeManager;
 import org.weakref.jmx.guice.MBeanModule;
 
-import javax.management.MBeanServer;
-
-import java.lang.management.ManagementFactory;
 import java.util.Map;
 import java.util.Optional;
 
@@ -67,9 +61,9 @@ public class IcebergConnectorFactory
 {
     private final String name;
     private final ClassLoader classLoader;
-    private final Optional<ExtendedHiveMetastore> metastore;
+    private final Optional<HiveMetastore> metastore;
 
-    public IcebergConnectorFactory(String name, ClassLoader classLoader, Optional<ExtendedHiveMetastore> metastore)
+    public IcebergConnectorFactory(String name, ClassLoader classLoader, Optional<HiveMetastore> metastore)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or empty");
         this.name = name;
@@ -104,13 +98,11 @@ public class IcebergConnectorFactory
                     new HiveSecurityModule(),
                     new HiveAuthenticationModule(),
                     new HiveMetastoreModule(metastore),
+                    new MBeanServerModule(),
                     binder -> {
-                        MBeanServer platformMBeanServer = ManagementFactory.getPlatformMBeanServer();
-                        binder.bind(MBeanServer.class).toInstance(new RebindSafeMBeanServer(platformMBeanServer));
                         binder.bind(NodeVersion.class).toInstance(new NodeVersion(context.getNodeManager().getCurrentNode().getVersion()));
                         binder.bind(NodeManager.class).toInstance(context.getNodeManager());
                         binder.bind(TypeManager.class).toInstance(context.getTypeManager());
-                        binder.bind(HiveMetastore.class).to(ThriftHiveMetastore.class).in(Scopes.SINGLETON);
                     });
 
             Injector injector = app

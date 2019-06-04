@@ -15,13 +15,13 @@ package io.prestosql.iceberg;
 
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.json.JsonCodec;
-import io.prestosql.plugin.hive.ForHiveClient;
+import io.prestosql.plugin.hive.ForHive;
 import io.prestosql.plugin.hive.HdfsEnvironment;
-import io.prestosql.plugin.hive.HiveClientConfig;
+import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.LocationService;
 import io.prestosql.plugin.hive.TransactionalMetadata;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
-import io.prestosql.plugin.hive.metastore.ExtendedHiveMetastore;
+import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.spi.type.TypeManager;
 
@@ -56,7 +56,7 @@ public class IcebergMetadataFactory
 
     private final boolean skipDeletionForAlter;
     private final long perTransactionCacheMaximumSize;
-    private final ExtendedHiveMetastore metastore;
+    private final HiveMetastore metastore;
     private final HdfsEnvironment hdfsEnvironment;
     private final TypeManager typeManager;
     private final JsonCodec<CommitTaskData> taskCommitCodec;
@@ -67,10 +67,10 @@ public class IcebergMetadataFactory
     @Inject
     @SuppressWarnings("deprecation")
     public IcebergMetadataFactory(
-            HiveClientConfig hiveClientConfig,
-            ExtendedHiveMetastore metastore,
+            HiveConfig hiveClientConfig,
+            HiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
-            @ForHiveClient ExecutorService executorService,
+            @ForHive ExecutorService executorService,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> commitTaskDataJsonCodec,
             IcebergUtil icebergUtil,
@@ -90,7 +90,7 @@ public class IcebergMetadataFactory
     }
 
     public IcebergMetadataFactory(
-            ExtendedHiveMetastore metastore,
+            HiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             int maxConcurrentFileRenames,
             boolean skipDeletionForAlter,
