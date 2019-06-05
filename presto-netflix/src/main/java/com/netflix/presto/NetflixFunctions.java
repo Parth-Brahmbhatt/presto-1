@@ -418,7 +418,7 @@ public final class NetflixFunctions
             throws IOException
     {
         String jsonStr = json.toStringUtf8();
-        if (jsonStr == null) {
+        if (jsonStr == null || jsonStr.isEmpty()) {
             return null;
         }
 
