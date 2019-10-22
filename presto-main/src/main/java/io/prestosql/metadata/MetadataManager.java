@@ -2152,7 +2152,13 @@ public final class MetadataManager
             SqlParser sqlParser = new SqlParser();
             Analyzer analyzer = new Analyzer(session, this, sqlParser, new AllowAllAccessControl(), Optional.<QueryExplainer>empty(),
                     new ArrayList(), new HashMap<>(), WarningCollector.NOOP);
-            io.prestosql.sql.tree.Statement statement = sqlParser.createStatement(sql, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));
+            io.prestosql.sql.tree.Statement statement = null;
+            try {
+                statement = sqlParser.createStatement(sql, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));
+            }
+            catch (Exception e) {
+                statement = sqlParser.createStatement(originalSql, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));
+            }
             io.prestosql.sql.analyzer.Analysis analysis = analyzer.analyze(statement);
             List<ConnectorViewDefinition.ViewColumn> columns = analysis.getOutputDescriptor()
                     .getVisibleFields().stream()
