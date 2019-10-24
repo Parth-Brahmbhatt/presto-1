@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.plugin.base.classloader.ClassLoaderSafeConnectorSplitSource;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorSplitSource;
@@ -31,6 +32,10 @@ import javax.inject.Inject;
 
 import static io.prestosql.plugin.iceberg.ExpressionConverter.toIcebergExpression;
 import static io.prestosql.plugin.iceberg.IcebergUtil.getIcebergTable;
+import java.util.Optional;
+
+import static io.prestosql.plugin.iceberg.IcebergUtil.getTableScan;
+import static io.prestosql.spi.StandardErrorCode.TABLE_NOT_FOUND;
 import static java.util.Objects.requireNonNull;
 
 public class IcebergSplitManager
@@ -40,12 +45,14 @@ public class IcebergSplitManager
 
     private final IcebergTransactionManager transactionManager;
     private final HdfsEnvironment hdfsEnvironment;
+    private IcebergUtil icebergUtil;
 
     @Inject
-    public IcebergSplitManager(IcebergTransactionManager transactionManager, HdfsEnvironment hdfsEnvironment)
+    public IcebergSplitManager(IcebergTransactionManager transactionManager, HdfsEnvironment hdfsEnvironment, IcebergUtil icebergUtil)
     {
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
+        this.icebergUtil = icebergUtil;
     }
 
     @Override
@@ -63,8 +70,11 @@ public class IcebergSplitManager
         }
 
         HiveMetastore metastore = transactionManager.get(transaction).getMetastore();
-        Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
+        Optional<Table> icebergTable = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
 
+        if (icebergTable.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + table.getSchemaTableName().toString());
+        }
         TableScan tableScan = icebergTable.newScan()
                 .filter(toIcebergExpression(
                         table.getEnforcedPredicate()

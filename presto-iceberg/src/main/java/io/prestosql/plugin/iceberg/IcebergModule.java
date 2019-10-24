@@ -15,12 +15,17 @@ package io.prestosql.plugin.iceberg;
 
 import com.google.inject.Binder;
 import com.google.inject.Module;
+import com.google.inject.Provides;
 import com.google.inject.Scopes;
 import com.google.inject.multibindings.Multibinder;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveHdfsModule;
+import io.prestosql.plugin.hive.HiveMetadata;
 import io.prestosql.plugin.hive.HiveNodePartitioningProvider;
+import io.prestosql.plugin.hive.HiveTransactionHandle;
+import io.prestosql.plugin.hive.HiveTransactionManager;
+import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.MetastoreConfig;
 import io.prestosql.plugin.hive.orc.OrcReaderConfig;
 import io.prestosql.plugin.hive.orc.OrcWriterConfig;
@@ -31,6 +36,10 @@ import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.procedure.Procedure;
+
+import javax.inject.Singleton;
+
+import java.util.function.Function;
 
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
 import static io.airlift.configuration.ConfigBinder.configBinder;
@@ -46,10 +55,14 @@ public class IcebergModule
         binder.install(new HiveHdfsModule());
 
         binder.bind(IcebergTransactionManager.class).in(Scopes.SINGLETON);
+        binder.bind(HiveTransactionManager.class).in(Scopes.SINGLETON);
 
         configBinder(binder).bindConfig(HiveConfig.class);
         configBinder(binder).bindConfig(IcebergConfig.class);
         configBinder(binder).bindConfig(MetastoreConfig.class);
+
+        configBinder(binder).bindConfig(IcebergConfig.class);
+        binder.bind(IcebergUtil.class).in(Scopes.SINGLETON);
 
         binder.bind(IcebergSessionProperties.class).in(Scopes.SINGLETON);
         binder.bind(IcebergTableProperties.class).in(Scopes.SINGLETON);
@@ -77,5 +90,17 @@ public class IcebergModule
 
         Multibinder<Procedure> procedures = newSetBinder(binder, Procedure.class);
         procedures.addBinding().toProvider(RollbackToSnapshotProcedure.class).in(Scopes.SINGLETON);
+    }
+
+    /**
+     * TODO, this is needed as LegacyAccessControl needs it. may be we should just get rid of LegacyAccessControl.
+     * @param transactionManager
+     * @return
+     */
+    @Singleton
+    @Provides
+    public Function<HiveTransactionHandle, SemiTransactionalHiveMetastore> createMetastoreGetter(HiveTransactionManager transactionManager)
+    {
+        return transactionHandle -> ((HiveMetadata) transactionManager.get(transactionHandle)).getMetastore();
     }
 }

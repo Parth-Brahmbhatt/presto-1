@@ -37,6 +37,7 @@ import io.prestosql.testng.services.Flaky;
 import io.prestosql.transaction.TransactionBuilder;
 import org.apache.iceberg.FileFormat;
 import org.intellij.lang.annotations.Language;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -102,10 +103,10 @@ public abstract class AbstractTestIcebergSmoke
     {
         assertThat(computeActual("SHOW CREATE SCHEMA tpch").getOnlyValue().toString())
                 .matches("CREATE SCHEMA iceberg.tpch\n" +
-                        "AUTHORIZATION USER user\n" +
-                        "WITH \\(\n" +
-                        "\\s+location = '.*/iceberg_data/tpch'\n" +
-                        "\\)");
+                        "AUTHORIZATION ROLE public\n" +
+                        "WITH (\n" +
+                        "   location = 's3n://netflix-dataoven-prod-users/hive/warehouse/tpch.db'\n" +
+                        ")");
     }
 
     @Override
@@ -193,17 +194,13 @@ public abstract class AbstractTestIcebergSmoke
         dropTable("test_iceberg_decimal");
     }
 
-    @Test
-    // This particular method may or may not be @Flaky. It is annotated since the problem is generic.
-    @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
+    @Test(enabled = false) // Metacat does not support TIME data type
     public void testTime()
     {
         testSelectOrPartitionedByTime(false);
     }
 
-    @Test
-    // This particular method may or may not be @Flaky. It is annotated since the problem is generic.
-    @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
+    @Test(enabled = false) // Metacat does not support TIME data type
     public void testPartitionedByTime()
     {
         testSelectOrPartitionedByTime(true);
@@ -212,7 +209,7 @@ public abstract class AbstractTestIcebergSmoke
     private void testSelectOrPartitionedByTime(boolean partitioned)
     {
         String tableName = format("test_%s_by_time", partitioned ? "partitioned" : "selected");
-        String partitioning = partitioned ? ", partitioning = ARRAY['x']" : "";
+        String partitioning = partitioned ? ", partitioned_by = ARRAY['x']" : "";
         assertUpdate(format("CREATE TABLE %s (x TIME(6), y BIGINT) WITH (format = '%s'%s)", tableName, format, partitioning));
         assertUpdate(format("INSERT INTO %s VALUES (TIME '10:12:34', 12345)", tableName), 1);
         assertQuery(format("SELECT COUNT(*) FROM %s", tableName), "SELECT 1");
@@ -246,7 +243,7 @@ public abstract class AbstractTestIcebergSmoke
     {
         String tableName = format("test_%s_by_timestamp", partitioned ? "partitioned" : "selected");
         assertUpdate(format("CREATE TABLE %s (_timestamp timestamp(6)) %s",
-                tableName, partitioned ? "WITH (partitioning = ARRAY['_timestamp'])" : ""));
+                tableName, partitioned ? "WITH (partitioned_by = ARRAY['_timestamp'])" : ""));
         @Language("SQL") String select1 = "SELECT TIMESTAMP '2017-05-01 10:12:34' _timestamp";
         @Language("SQL") String select2 = "SELECT TIMESTAMP '2017-10-01 10:12:34' _timestamp";
         @Language("SQL") String select3 = "SELECT TIMESTAMP '2018-05-01 10:12:34' _timestamp";
@@ -283,7 +280,7 @@ public abstract class AbstractTestIcebergSmoke
                 ", _date DATE" +
                 ") " +
                 "WITH (" +
-                "partitioning = ARRAY[" +
+                "partitioned_by = ARRAY[" +
                 "  '_string'," +
                 "  '_integer'," +
                 "  '_bigint'," +
@@ -344,7 +341,7 @@ public abstract class AbstractTestIcebergSmoke
                 ", _date DATE" +
                 ") " +
                 "WITH (" +
-                "partitioning = ARRAY['_date']" +
+                "partitioned_by = ARRAY['_date']" +
                 ")";
 
         assertUpdate(createTable);
@@ -371,7 +368,7 @@ public abstract class AbstractTestIcebergSmoke
                 ", _date DATE" +
                 ") " +
                 "WITH (" +
-                "partitioning = ARRAY[" +
+                "partitioned_by = ARRAY[" +
                 "  '_string'," +
                 "  '_integer'," +
                 "  '_bigint'," +
@@ -415,7 +412,7 @@ public abstract class AbstractTestIcebergSmoke
         @Language("SQL") String createTable = "" +
                 "CREATE TABLE test_create_partitioned_table_as " +
                 "WITH (" +
-                "partitioning = ARRAY['ORDER_STATUS', 'Ship_Priority', 'Bucket(order_key,9)']" +
+                "partitioned_by = ARRAY['ORDER_STATUS', 'Ship_Priority', 'Bucket(order_key,9)']" +
                 ") " +
                 "AS " +
                 "SELECT orderkey AS order_key, shippriority AS ship_priority, orderstatus AS order_status " +
@@ -431,7 +428,7 @@ public abstract class AbstractTestIcebergSmoke
                         ")\n" +
                         "WITH (\n" +
                         "   format = '%s',\n" +
-                        "   partitioning = ARRAY['order_status','ship_priority','bucket(order_key, 9)']\n" +
+                        "   partitioned_by = ARRAY['order_status','ship_priority','bucket(order_key, 9)']\n" +
                         ")",
                 getSession().getCatalog().orElseThrow(),
                 getSession().getSchema().orElseThrow(),
@@ -524,7 +521,9 @@ public abstract class AbstractTestIcebergSmoke
     public void testRollbackSnapshot()
     {
         assertUpdate("CREATE TABLE test_rollback (col0 INTEGER, col1 BIGINT)");
-        long afterCreateTableId = getLatestSnapshotId("test_rollback");
+
+        assertEquals(computeActual(format("SELECT snapshot_id FROM \"%s$snapshots\" ORDER BY committed_at DESC LIMIT 1", "test_rollback"))
+                .getRowCount(), 0);
 
         assertUpdate("INSERT INTO test_rollback (col0, col1) VALUES (123, CAST(987 AS BIGINT))", 1);
         long afterFirstInsertId = getLatestSnapshotId("test_rollback");
@@ -535,8 +534,8 @@ public abstract class AbstractTestIcebergSmoke
         assertUpdate(format("CALL system.rollback_to_snapshot('tpch', 'test_rollback', %s)", afterFirstInsertId));
         assertQuery("SELECT * FROM test_rollback ORDER BY col0", "VALUES (123, CAST(987 AS BIGINT))");
 
-        assertUpdate(format("CALL system.rollback_to_snapshot('tpch', 'test_rollback', %s)", afterCreateTableId));
-        assertEquals((long) computeActual("SELECT COUNT(*) FROM test_rollback").getOnlyValue(), 0);
+        assertUpdate(format("CALL system.rollback_to_snapshot('tpch', 'test_rollback', %s)", afterFirstInsertId));
+        assertEquals((long) computeActual("SELECT COUNT(*) FROM test_rollback").getOnlyValue(), 1);
 
         dropTable("test_rollback");
     }
@@ -627,10 +626,10 @@ public abstract class AbstractTestIcebergSmoke
 
     private void testCreateTableLikeForFormat(FileFormat otherFormat)
     {
-        assertUpdate(format("CREATE TABLE test_create_table_like_original (col1 INTEGER, aDate DATE) WITH(format = '%s', partitioning = ARRAY['aDate'])", format));
+        assertUpdate(format("CREATE TABLE test_create_table_like_original (col1 INTEGER, aDate DATE) WITH(format = '%s', partitioned_by = ARRAY['aDate'])", format));
         assertEquals(getTablePropertiesString("test_create_table_like_original"), "WITH (\n" +
                 format("   format = '%s',\n", format) +
-                "   partitioning = ARRAY['adate']\n" +
+                "   partitioned_by = ARRAY['adate']\n" +
                 ")");
 
         assertUpdate("CREATE TABLE test_create_table_like_copy0 (LIKE test_create_table_like_original, col2 INTEGER)");
@@ -651,14 +650,15 @@ public abstract class AbstractTestIcebergSmoke
         assertUpdate("CREATE TABLE test_create_table_like_copy3 (LIKE test_create_table_like_original INCLUDING PROPERTIES)");
         assertEquals(getTablePropertiesString("test_create_table_like_copy3"), "WITH (\n" +
                 format("   format = '%s',\n", format) +
-                "   partitioning = ARRAY['adate']\n" +
+                "   partitioned_by = ARRAY['adate']\n" +
                 ")");
         dropTable("test_create_table_like_copy3");
 
         assertUpdate(format("CREATE TABLE test_create_table_like_copy4 (LIKE test_create_table_like_original INCLUDING PROPERTIES) WITH (format = '%s')", otherFormat));
+
         assertEquals(getTablePropertiesString("test_create_table_like_copy4"), "WITH (\n" +
                 format("   format = '%s',\n", otherFormat) +
-                "   partitioning = ARRAY['adate']\n" +
+                "   partitioned_by = ARRAY['adate']\n" +
                 ")");
         dropTable("test_create_table_like_copy4");
 
@@ -689,7 +689,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testHourTransform()
     {
-        assertUpdate("CREATE TABLE test_hour_transform (d TIMESTAMP(6), b BIGINT) WITH (partitioning = ARRAY['hour(d)'])");
+        assertUpdate("CREATE TABLE test_hour_transform (d TIMESTAMP(6), b BIGINT) WITH (partitioned_by = ARRAY['hour(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(TIMESTAMP '1969-12-31 22:22:22.222222', 8)," +
@@ -733,7 +733,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testDayTransformDate()
     {
-        assertUpdate("CREATE TABLE test_day_transform_date (d DATE, b BIGINT) WITH (partitioning = ARRAY['day(d)'])");
+        assertUpdate("CREATE TABLE test_day_transform_date (d DATE, b BIGINT) WITH (partitioned_by = ARRAY['day(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(DATE '1969-01-01', 10), " +
@@ -770,7 +770,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testDayTransformTimestamp()
     {
-        assertUpdate("CREATE TABLE test_day_transform_timestamp (d TIMESTAMP(6), b BIGINT) WITH (partitioning = ARRAY['day(d)'])");
+        assertUpdate("CREATE TABLE test_day_transform_timestamp (d TIMESTAMP(6), b BIGINT) WITH (partitioned_by = ARRAY['day(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(TIMESTAMP '1969-12-25 15:13:12.876543', 8)," +
@@ -815,7 +815,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testMonthTransformDate()
     {
-        assertUpdate("CREATE TABLE test_month_transform_date (d DATE, b BIGINT) WITH (partitioning = ARRAY['month(d)'])");
+        assertUpdate("CREATE TABLE test_month_transform_date (d DATE, b BIGINT) WITH (partitioned_by = ARRAY['month(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(DATE '1969-11-13', 1)," +
@@ -855,7 +855,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testMonthTransformTimestamp()
     {
-        assertUpdate("CREATE TABLE test_month_transform_timestamp (d TIMESTAMP(6), b BIGINT) WITH (partitioning = ARRAY['month(d)'])");
+        assertUpdate("CREATE TABLE test_month_transform_timestamp (d TIMESTAMP(6), b BIGINT) WITH (partitioned_by = ARRAY['month(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(TIMESTAMP '1969-11-15 15:13:12.876543', 8)," +
@@ -898,7 +898,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testYearTransformDate()
     {
-        assertUpdate("CREATE TABLE test_year_transform_date (d DATE, b BIGINT) WITH (partitioning = ARRAY['year(d)'])");
+        assertUpdate("CREATE TABLE test_year_transform_date (d DATE, b BIGINT) WITH (partitioned_by = ARRAY['year(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(DATE '1968-10-13', 1), " +
@@ -933,7 +933,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testYearTransformTimestamp()
     {
-        assertUpdate("CREATE TABLE test_year_transform_timestamp (d TIMESTAMP(6), b BIGINT) WITH (partitioning = ARRAY['year(d)'])");
+        assertUpdate("CREATE TABLE test_year_transform_timestamp (d TIMESTAMP(6), b BIGINT) WITH (partitioned_by = ARRAY['year(d)'])");
 
         @Language("SQL") String values = "VALUES " +
                 "(TIMESTAMP '1968-03-15 15:13:12.876543', 1)," +
@@ -976,7 +976,7 @@ public abstract class AbstractTestIcebergSmoke
     {
         String select = "SELECT d_trunc, row_count, d.min AS d_min, d.max AS d_max, b.min AS b_min, b.max AS b_max FROM \"test_truncate_transform$partitions\"";
 
-        assertUpdate("CREATE TABLE test_truncate_transform (d VARCHAR, b BIGINT) WITH (partitioning = ARRAY['truncate(d, 2)'])");
+        assertUpdate("CREATE TABLE test_truncate_transform (d VARCHAR, b BIGINT) WITH (partitioned_by = ARRAY['truncate(d, 2)'])");
 
         @Language("SQL") String insertSql = "INSERT INTO test_truncate_transform VALUES" +
                 "('abcd', 1)," +
@@ -1009,7 +1009,7 @@ public abstract class AbstractTestIcebergSmoke
     {
         String select = "SELECT d_bucket, row_count, d.min AS d_min, d.max AS d_max, b.min AS b_min, b.max AS b_max FROM \"test_bucket_transform$partitions\"";
 
-        assertUpdate("CREATE TABLE test_bucket_transform (d VARCHAR, b BIGINT) WITH (partitioning = ARRAY['bucket(d, 2)'])");
+        assertUpdate("CREATE TABLE test_bucket_transform (d VARCHAR, b BIGINT) WITH (partitioned_by = ARRAY['bucket(d, 2)'])");
         @Language("SQL") String insertSql = "INSERT INTO test_bucket_transform VALUES" +
                 "('abcd', 1)," +
                 "('abxy', 2)," +
@@ -1034,7 +1034,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testMetadataDeleteSimple()
     {
-        assertUpdate("CREATE TABLE test_metadata_delete_simple (col1 BIGINT, col2 BIGINT) WITH (partitioning = ARRAY['col1'])");
+        assertUpdate("CREATE TABLE test_metadata_delete_simple (col1 BIGINT, col2 BIGINT) WITH (partitioned_by = ARRAY['col1'])");
         assertUpdate("INSERT INTO test_metadata_delete_simple VALUES(1, 100), (1, 101), (1, 102), (2, 200), (2, 201), (3, 300)", 6);
         assertQueryFails(
                 "DELETE FROM test_metadata_delete_simple WHERE col1 = 1 AND col2 > 101",
@@ -1059,7 +1059,7 @@ public abstract class AbstractTestIcebergSmoke
                 "  linestatus VARCHAR" +
                 ") " +
                 "WITH (" +
-                " partitioning = ARRAY[ 'linenumber', 'linestatus' ]" +
+                " partitioned_by = ARRAY[ 'linenumber', 'linestatus' ]" +
                 ") ";
 
         assertUpdate(createTable);
@@ -1204,7 +1204,7 @@ public abstract class AbstractTestIcebergSmoke
     @Flaky(issue = "https://github.com/prestosql/presto/issues/5201", match = "Failed to read footer of file: io.prestosql.plugin.iceberg.HdfsInputFile")
     public void testPartitionedTableStatistics()
     {
-        assertUpdate("CREATE TABLE iceberg.tpch.test_partitioned_table_statistics (col1 REAL, col2 BIGINT) WITH (partitioning = ARRAY['col2'])");
+        assertUpdate("CREATE TABLE iceberg.tpch.test_partitioned_table_statistics (col1 REAL, col2 BIGINT) WITH (partitioned_by = ARRAY['col2'])");
 
         String insertStart = "INSERT INTO test_partitioned_table_statistics";
         assertUpdate(insertStart + " VALUES (-10, -1)", 1);
@@ -1282,7 +1282,7 @@ public abstract class AbstractTestIcebergSmoke
     public void testStatisticsConstraints()
     {
         String tableName = "iceberg.tpch.test_simple_partitioned_table_statistics";
-        assertUpdate("CREATE TABLE iceberg.tpch.test_simple_partitioned_table_statistics (col1 BIGINT, col2 BIGINT) WITH (partitioning = ARRAY['col1'])");
+        assertUpdate("CREATE TABLE iceberg.tpch.test_simple_partitioned_table_statistics (col1 BIGINT, col2 BIGINT) WITH (partitioned_by = ARRAY['col1'])");
 
         String insertStart = "INSERT INTO iceberg.tpch.test_simple_partitioned_table_statistics";
         assertUpdate(insertStart + " VALUES (1, 101), (2, 102), (3, 103), (4, 104)", 4);
@@ -1499,7 +1499,7 @@ public abstract class AbstractTestIcebergSmoke
                 ", ts TIMESTAMP(6)" +
                 ", str ROW(id INTEGER , vc VARCHAR)" +
                 ", dt DATE)" +
-                " WITH (partitioning = ARRAY['int'])";
+                " WITH (partitioned_by = ARRAY['int'])";
 
         assertUpdate(createTable);
 
@@ -1526,7 +1526,7 @@ public abstract class AbstractTestIcebergSmoke
                 ", dec DECIMAL(5,2)" +
                 ", str ROW(id INTEGER, vc VARCHAR, arr ARRAY(INTEGER))" +
                 ", vc VARCHAR)" +
-                " WITH (partitioning = ARRAY['int'])";
+                " WITH (partitioned_by = ARRAY['int'])";
 
         assertUpdate(createTable2);
 
@@ -1540,7 +1540,7 @@ public abstract class AbstractTestIcebergSmoke
         assertEquals(result.getRowCount(), 1);
 
         @Language("SQL") String createTable3 = "" +
-                "CREATE TABLE test_nested_table_3 WITH (partitioning = ARRAY['int']) AS SELECT * FROM test_nested_table_2";
+                "CREATE TABLE test_nested_table_3 WITH (partitioned_by = ARRAY['int']) AS SELECT * FROM test_nested_table_2";
 
         assertUpdate(createTable3, 1);
 
@@ -1585,5 +1585,14 @@ public abstract class AbstractTestIcebergSmoke
         Session session = getSession();
         assertUpdate(session, "DROP TABLE " + table);
         assertFalse(getQueryRunner().tableExists(session, table));
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+    {
+        MaterializedResult baseResult = computeActual("show tables in tpch");
+        for (MaterializedRow row : baseResult.getMaterializedRows()) {
+            assertUpdate("DROP TABLE IF EXISTS " + row.getField(0).toString());
+        }
     }
 }

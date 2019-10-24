@@ -34,7 +34,7 @@ import static java.util.Locale.ENGLISH;
 public class IcebergTableProperties
 {
     public static final String FILE_FORMAT_PROPERTY = "format";
-    public static final String PARTITIONING_PROPERTY = "partitioning";
+    public static final String PARTITIONING_PROPERTY = "partitioned_by";
 
     private final List<PropertyMetadata<?>> tableProperties;
 

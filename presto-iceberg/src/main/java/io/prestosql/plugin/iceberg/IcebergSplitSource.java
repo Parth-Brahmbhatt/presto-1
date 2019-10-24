@@ -113,6 +113,7 @@ public class IcebergSplitSource
     {
         StructLike partition = scanTask.file().partition();
         PartitionSpec spec = scanTask.spec();
+        //@todo(anjali) this is `getpartitions` call in nflx repo
         Map<PartitionField, Integer> fieldToIndex = getIdentityPartitions(spec);
         Map<Integer, String> partitionKeys = new HashMap<>();
 

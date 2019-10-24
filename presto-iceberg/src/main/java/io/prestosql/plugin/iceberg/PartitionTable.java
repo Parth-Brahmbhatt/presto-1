@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.iceberg.IcebergUtil.getIdentityPartitions;
+import static io.prestosql.plugin.iceberg.IcebergUtil.getTableScan;
 import static io.prestosql.plugin.iceberg.TypeConverter.toPrestoType;
 import static io.prestosql.plugin.iceberg.util.Timestamps.timestampTzFromMicros;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -94,7 +95,7 @@ public class PartitionTable
                 .collect(toImmutableList());
         columnMetadataBuilder.addAll(partitionColumnsMetadata);
 
-        Set<Integer> identityPartitionIds = getIdentityPartitions(icebergTable.spec()).keySet().stream()
+        Set<Integer> identityPartitionIds = IcebergUtil.getPartitions(icebergTable.spec(), true).keySet().stream()
                 .map(PartitionField::sourceId)
                 .collect(toSet());
 

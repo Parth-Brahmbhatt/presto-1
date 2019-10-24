@@ -70,7 +70,6 @@ import static io.prestosql.plugin.iceberg.TypeConverter.toPrestoType;
 import static io.prestosql.plugin.iceberg.util.PrimitiveTypeMapBuilder.makeTypeMap;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.util.Objects.requireNonNull;
-import static org.apache.iceberg.parquet.ParquetSchemaUtil.convert;
 
 public class IcebergFileWriterFactory
 {
@@ -151,7 +150,7 @@ public class IcebergFileWriterFactory
                     hdfsEnvironment.doAs(session.getUser(), () -> fileSystem.create(outputPath)),
                     rollbackAction,
                     fileColumnTypes,
-                    convert(icebergSchema, "table"),
+                    ParquetSchemaUtil.convert(icebergSchema, "table"),
                     makeTypeMap(fileColumnTypes, fileColumnNames),
                     parquetWriterOptions,
                     IntStream.range(0, fileColumnNames.size()).toArray(),

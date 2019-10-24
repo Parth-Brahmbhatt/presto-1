@@ -400,7 +400,7 @@ public abstract class AbstractTestIntegrationSmokeTest
                         "('views')");
     }
 
-    @Test
+    @Test(enabled = false) // Metacat does not support TIME data type
     public void testSelectInformationSchemaColumns()
     {
         String catalog = getSession().getCatalog().get();

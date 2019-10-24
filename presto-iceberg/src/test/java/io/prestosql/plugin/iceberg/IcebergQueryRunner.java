@@ -69,14 +69,16 @@ public final class IcebergQueryRunner
 
         queryRunner.installPlugin(new IcebergPlugin());
         Map<String, String> icebergProperties = ImmutableMap.<String, String>builder()
-                .put("hive.metastore", "file")
-                .put("hive.metastore.catalog.dir", dataDir.toString())
+                .put("hive.metastore.uri", "thrift://metacat.dynprod.netflix.net:12001")
                 .put("iceberg.file-format", format.name())
+                .put("iceberg.metacat-rest-endpoint", "http://metacat.dynprod.netflix.net:7001")
+                .put("iceberg.metacat-catalog-name", "prodhive")
+                .put("iceberg.metastore-warehouse-dir", "s3n://netflix-dataoven-prod-users/hive/warehouse")
                 .build();
 
         queryRunner.createCatalog(ICEBERG_CATALOG, "iceberg", icebergProperties);
 
-        queryRunner.execute("CREATE SCHEMA tpch");
+        queryRunner.execute("CREATE SCHEMA IF NOT EXISTS tpch");
 
         if (createTpchTables) {
             copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, session, TpchTable.getTables());

@@ -16,7 +16,6 @@ package io.prestosql.plugin.iceberg;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;

@@ -37,6 +37,8 @@ import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.doubleProperty;
 import static io.prestosql.spi.session.PropertyMetadata.enumProperty;
 import static io.prestosql.spi.session.PropertyMetadata.integerProperty;
+import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static java.lang.String.format;
 
 public final class IcebergSessionProperties
@@ -60,6 +62,8 @@ public final class IcebergSessionProperties
     private static final String PARQUET_MAX_READ_BLOCK_SIZE = "parquet_max_read_block_size";
     private static final String PARQUET_WRITER_BLOCK_SIZE = "parquet_writer_block_size";
     private static final String PARQUET_WRITER_PAGE_SIZE = "parquet_writer_page_size";
+    public static final String AWS_IAM_ROLE = "aws_iam_role";
+
     private final List<PropertyMetadata<?>> sessionProperties;
 
     @Inject
@@ -175,6 +179,11 @@ public final class IcebergSessionProperties
                         PARQUET_WRITER_PAGE_SIZE,
                         "Parquet: Writer page size",
                         parquetWriterConfig.getPageSize(),
+                        false))
+                .add(stringProperty(
+                        AWS_IAM_ROLE,
+                        "AWS IAM Role for S3",
+                        "",
                         false))
                 .build();
     }

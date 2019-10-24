@@ -35,6 +35,7 @@ import io.prestosql.plugin.hive.gcs.HiveGcsModule;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastoreModule;
 import io.prestosql.plugin.hive.s3.HiveS3Module;
+import io.prestosql.plugin.hive.security.HiveSecurityModule;
 import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
@@ -69,6 +70,7 @@ public final class InternalIcebergConnectorFactory
                     new HiveS3Module(),
                     new HiveGcsModule(),
                     new HiveAzureModule(),
+                    new HiveSecurityModule(catalogName),
                     new HiveAuthenticationModule(),
                     new HiveMetastoreModule(metastore),
                     new MBeanServerModule(),

@@ -13,22 +13,32 @@
  */
 package io.prestosql.plugin.iceberg;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.netflix.iceberg.metacat.MetacatIcebergCatalog;
 import io.prestosql.plugin.hive.HdfsEnvironment;
-import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
-import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.plugin.hive.HiveColumnHandle.ColumnType;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.TypeManager;
-import org.apache.iceberg.BaseTable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.HistoryEntry;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableScan;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
+
+import javax.inject.Inject;
 import org.apache.iceberg.TableOperations;
 
 import java.util.List;
@@ -39,6 +49,10 @@ import java.util.regex.Pattern;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.reverse;
+import static com.google.common.collect.Streams.stream;
+import static com.google.shaded.shaded.common.collect.Maps.uniqueIndex;
+import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
+import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveMetadata.TABLE_COMMENT;
 import static io.prestosql.plugin.iceberg.IcebergErrorCode.ICEBERG_INVALID_SNAPSHOT_ID;
 import static io.prestosql.plugin.iceberg.TypeConverter.toPrestoType;
@@ -53,18 +67,36 @@ final class IcebergUtil
     private static final Pattern SIMPLE_NAME = Pattern.compile("[a-z][a-z0-9]*");
 
     private IcebergUtil() {}
+    public static final String NETFLIX_METACAT_HOST = "netflix.metacat.host";
+    public static final String NETFLIX_WAREHOUSE_DIR = "hive.metastore.warehouse.dir";
+    public static final String APP_NAME = "presto-" + System.getenv("stack");
+
+    private final IcebergConfig config;
+
+    @Inject
+    public IcebergUtil(IcebergConfig config)
+    {
+        this.config = config;
+    }
 
     public static boolean isIcebergTable(io.prestosql.plugin.hive.metastore.Table table)
     {
         return ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(table.getParameters().get(TABLE_TYPE_PROP));
     }
 
-    public static Table getIcebergTable(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment, ConnectorSession session, SchemaTableName table)
+    public Optional<Table> getIcebergTable(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment, ConnectorSession session, SchemaTableName table)
     {
-        HdfsContext hdfsContext = new HdfsContext(session, table.getSchemaName(), table.getTableName());
-        HiveIdentity identity = new HiveIdentity(session);
-        TableOperations operations = new HiveTableOperations(metastore, hdfsEnvironment, hdfsContext, identity, table.getSchemaName(), table.getTableName());
-        return new BaseTable(operations, quotedTableName(table));
+        // Configuration configuration = new Configuration(false); anjali this is not working
+        // anjali Major hack David's commit removes this tmp code, adding it back to get things to work. I was getting s3n file system not known/found error
+        // on insert into iceberg table
+        Configuration configuration = hdfsEnvironment.getConfiguration(new HdfsEnvironment.HdfsContext(session, table.getSchemaName()),
+                new Path("file:///tmp"));
+        try {
+            return Optional.of(getCatalog(configuration).loadTable(toTableIdentifier(config, table.getSchemaName(), table.getTableName())));
+        }
+        catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     public static long resolveSnapshotId(Table table, long snapshotId)
@@ -74,21 +106,50 @@ final class IcebergUtil
         }
 
         return reverse(table.history()).stream()
-                .filter(entry -> entry.timestampMillis() <= snapshotId)
-                .map(HistoryEntry::snapshotId)
-                .findFirst()
-                .orElseThrow(() -> new PrestoException(ICEBERG_INVALID_SNAPSHOT_ID, format("Invalid snapshot [%s] for table: %s", snapshotId, table)));
+            .filter(entry -> entry.timestampMillis() <= snapshotId)
+            .map(HistoryEntry::snapshotId)
+            .findFirst()
+            .orElseThrow(() -> new PrestoException(ICEBERG_INVALID_SNAPSHOT_ID, format("Invalid snapshot [%s] for table: %s", snapshotId, table)));
     }
 
-    public static List<IcebergColumnHandle> getColumns(Schema schema, TypeManager typeManager)
+    public MetacatIcebergCatalog getCatalog(Configuration configuration)
     {
-        return schema.columns().stream()
-                .map(column -> new IcebergColumnHandle(
-                        column.fieldId(),
-                        column.name(),
-                        toPrestoType(column.type(), typeManager),
-                        Optional.ofNullable(column.doc())))
-                .collect(toImmutableList());
+        configuration.set(NETFLIX_METACAT_HOST, config.getMetastoreRestEndpoint());
+        configuration.set(NETFLIX_WAREHOUSE_DIR, config.getMetastoreWarehoseDir());
+        // anjali productize this
+        configuration.set("fs.s3n.impl", "io.prestosql.plugin.hive.s3.PrestoS3FileSystem");
+        return new MetacatIcebergCatalog(configuration, APP_NAME);
+    }
+
+    public static List<IcebergColumnHandle> getColumns(Schema schema, PartitionSpec spec, TypeManager typeManager)
+    {
+        // Iceberg may or may not store identity columns in data file and the identity transformations have the same name as data column.
+        // So we remove the identity columns from the set of regular columns which does not work with some of Presto's validation.
+
+        List<PartitionField> partitionFields = ImmutableList.copyOf(getPartitions(spec, false).keySet());
+        Map<String, PartitionField> partitionColumnNames = uniqueIndex(partitionFields, PartitionField::name);
+
+        int columnIndex = 0;
+        ImmutableList.Builder<IcebergColumnHandle> builder = ImmutableList.builder();
+
+        for (Types.NestedField column : schema.columns()) {
+            Type type = column.type();
+            ColumnType columnType = REGULAR;
+            if (partitionColumnNames.containsKey(column.name())) {
+                PartitionField partitionField = partitionColumnNames.get(column.name());
+                Type sourceType = schema.findType(partitionField.sourceId());
+                type = partitionField.transform().getResultType(sourceType);
+                columnType = PARTITION_KEY;
+            }
+            IcebergColumnHandle columnHandle = new IcebergColumnHandle(
+                    column.fieldId(),
+                    column.name(),
+                    toPrestoType(column.type(), typeManager),
+                    Optional.ofNullable(column.doc()));
+            builder.add(columnHandle);
+        }
+
+        return builder.build();
     }
 
     public static Map<PartitionField, Integer> getIdentityPartitions(PartitionSpec partitionSpec)
@@ -98,6 +159,19 @@ final class IcebergUtil
         for (int i = 0; i < partitionSpec.fields().size(); i++) {
             PartitionField field = partitionSpec.fields().get(i);
             if (field.transform().toString().equals("identity")) {
+                columns.put(field, i);
+            }
+        }
+        return columns.build();
+    }
+
+    public static Map<PartitionField, Integer> getPartitions(PartitionSpec partitionSpec, boolean identityPartitionsOnly)
+    {
+        // TODO: expose transform information in Iceberg library
+        ImmutableMap.Builder<PartitionField, Integer> columns = ImmutableMap.builder();
+        for (int i = 0; i < partitionSpec.fields().size(); i++) {
+            PartitionField field = partitionSpec.fields().get(i);
+            if (identityPartitionsOnly == false || (identityPartitionsOnly && field.transform().toString().equals("identity"))) {
                 columns.put(field, i);
             }
         }
@@ -135,5 +209,11 @@ final class IcebergUtil
             return name;
         }
         return '"' + name.replace("\"", "\"\"") + '"';
+    }
+
+    public static TableIdentifier toTableIdentifier(IcebergConfig icebergConfig, String db, String tableName)
+    {
+        Namespace namespace = Namespace.of(icebergConfig.getMetacatCatalogName(), db);
+        return TableIdentifier.of(namespace, tableName);
     }
 }

@@ -20,12 +20,15 @@ import org.apache.iceberg.FileFormat;
 import javax.validation.constraints.NotNull;
 
 import static io.prestosql.plugin.hive.HiveCompressionCodec.GZIP;
-import static io.prestosql.plugin.iceberg.IcebergFileFormat.ORC;
+import static io.prestosql.plugin.iceberg.IcebergFileFormat.PARQUET;
 
 public class IcebergConfig
 {
-    private IcebergFileFormat fileFormat = ORC;
+    private IcebergFileFormat fileFormat = PARQUET;
     private HiveCompressionCodec compressionCodec = GZIP;
+    private String metastoreRestEndpoint;
+    private String metacatCatalogName;
+    private String metastoreWarehoseDir;
 
     @NotNull
     public FileFormat getFileFormat()
@@ -51,5 +54,38 @@ public class IcebergConfig
     {
         this.compressionCodec = compressionCodec;
         return this;
+    }
+
+    public String getMetastoreRestEndpoint()
+    {
+        return metastoreRestEndpoint;
+    }
+
+    @Config("iceberg.metacat-rest-endpoint")
+    public void setMetastoreRestEndpoint(String metastoreRestEndpoint)
+    {
+        this.metastoreRestEndpoint = metastoreRestEndpoint;
+    }
+
+    public String getMetacatCatalogName()
+    {
+        return metacatCatalogName;
+    }
+
+    @Config("iceberg.metacat-catalog-name")
+    public void setMetacatCatalogName(String metacatCatalogName)
+    {
+        this.metacatCatalogName = metacatCatalogName;
+    }
+
+    @Config("iceberg.metastore-warehouse-dir")
+    public void setMetastoreWarehoseDir(String metastoreWarehoseDir)
+    {
+        this.metastoreWarehoseDir = metastoreWarehoseDir;
+    }
+
+    public String getMetastoreWarehoseDir()
+    {
+        return metastoreWarehoseDir;
     }
 }

@@ -554,6 +554,14 @@
                 <version>3.2.0-9</version>
             </dependency>
 
+            <!--            We need to use Netflix Hive as it has some timestamp fixes. But if we use Netflix hive, ORC tests fail. -->
+<!--            <dependency>-->
+<!--                <groupId>io.prestosql.hive</groupId>-->
+<!--                <artifactId>hive-apache</artifactId>-->
+<!--                <version>3.0.0-6-nflx</version>-->
+<!--            </dependency>-->
+
+<!--            OSS Hive dependency. Need to use Netflix Hive as it has some timestamp fixes. -->
             <dependency>
                 <groupId>io.prestosql.hive</groupId>
                 <artifactId>hive-apache</artifactId>
@@ -1305,6 +1313,46 @@
             </dependency>
 
             <dependency>
+                <groupId>netflix</groupId>
+                <artifactId>metacat-client</artifactId>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>javax.ws.rs</groupId>
+                        <artifactId>jsr311-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>javax.ws.rs</groupId>
+                        <artifactId>javax.ws.rs-api</artifactId>
+                    </exclusion>
+                </exclusions>
+                <version>1.110</version>
+            </dependency>
+
+            <dependency>
+                <groupId>netflix</groupId>
+                <artifactId>metacat-common</artifactId>
+                <version>1.109.0</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>javax.ws.rs</groupId>
+                        <artifactId>jsr311-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>javax.ws.rs</groupId>
+                        <artifactId>javax.ws.rs-api</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
                 <groupId>org.alluxio</groupId>
                 <artifactId>alluxio-shaded-client</artifactId>
                 <version>2.4.0</version>
@@ -1408,6 +1456,12 @@
                         <artifactId>slf4j-log4j12</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>org.checkerframework</groupId>
+                <artifactId>checker-qual</artifactId>
+                <version>2.11.1</version>
             </dependency>
 
             <!-- force newer version to be used for dependencies -->
@@ -1626,6 +1680,7 @@
                     </exclusion>
                 </exclusions>
             </dependency>
+
         </dependencies>
     </dependencyManagement>
 

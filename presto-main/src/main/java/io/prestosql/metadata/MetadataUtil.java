@@ -16,7 +16,12 @@ package io.prestosql.metadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.netflix.metacat.client.Client;
+import com.netflix.metacat.common.dto.TableDto;
+import com.netflix.metacat.common.exception.MetacatNotFoundException;
+import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -32,7 +37,11 @@ import io.prestosql.sql.tree.PrincipalSpecification;
 import io.prestosql.sql.tree.QualifiedName;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.MISSING_CATALOG_NAME;
@@ -48,6 +57,11 @@ import static java.util.Objects.requireNonNull;
 
 public final class MetadataUtil
 {
+    private static final Logger log = Logger.get(MetadataUtil.class);
+    private static final Pattern TABLE_PATTERN = Pattern.compile("(?<table>(?:[^$@_]|_[^$@_])+)" +
+            "(?:(?:@|__)(?<ver1>\\d+))?" +
+            "(?:(?:\\$|__)(?<type>(?:history|snapshots|manifests|partitions))(?:(?:@|__)(?<ver2>\\d+))?)?");
+
     private MetadataUtil() {}
 
     public static void checkTableName(String catalogName, Optional<String> schemaName, Optional<String> tableName)
@@ -153,6 +167,44 @@ public final class MetadataUtil
         String catalogName = (parts.size() > 2) ? parts.get(2) : session.getCatalog().orElseThrow(() ->
                 semanticException(MISSING_CATALOG_NAME, node, "Catalog must be specified when session catalog is not set"));
 
+        final String metacatUri = SystemSessionProperties.getMetacatUri(session);
+        if (metacatUri != null) {
+            final Map<String, String> metacatCatalogMapping = SystemSessionProperties.getMetacatCatalogMapping(session);
+            final Map<String, String> icebergCatalogMapping = SystemSessionProperties.getIcebergCatalogMapping(session);
+            final Map<String, String> hiveToIcebergCatalogMapping = icebergCatalogMapping.entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+            if (metacatCatalogMapping.containsKey(catalogName) && !"information_schema".equalsIgnoreCase(schemaName) &&
+                    (hiveToIcebergCatalogMapping.containsKey(catalogName) || icebergCatalogMapping.containsKey(catalogName))) {
+                final String stack = System.getenv("stack");
+                Client client = Client.builder()
+                        .withHost(metacatUri)
+                        .withDataTypeContext("hive")
+                        .withUserName("presto-iceberg-checker")
+                        .withClientAppName("presto-" + stack)
+                        .build();
+                try {
+                    final String metacatCatalogName = metacatCatalogMapping.get(catalogName);
+                    String tableName = parseTableIdentifier(objectName);
+
+                    final TableDto table = client.getApi().getTable(metacatCatalogName, schemaName, tableName, true, true, false);
+                    final Map<String, String> metadata = table.getMetadata();
+                    if (metadata.containsKey("table_type") && metadata.get("table_type").equalsIgnoreCase("iceberg")) {
+                        if (hiveToIcebergCatalogMapping.containsKey(catalogName)) {
+                            log.info("Rewriting the catalog from %s to %s ", catalogName, hiveToIcebergCatalogMapping.get(catalogName));
+                            return new QualifiedObjectName(hiveToIcebergCatalogMapping.get(catalogName), schemaName, objectName);
+                        }
+                    }
+                    else {
+                        if (icebergCatalogMapping.containsKey(catalogName)) {
+                            log.info("Rewriting the catalog from %s to %s ", catalogName, icebergCatalogMapping.get(catalogName));
+                            return new QualifiedObjectName(icebergCatalogMapping.get(catalogName), schemaName, objectName);
+                        }
+                    }
+                }
+                catch (MetacatNotFoundException e) {
+                    log.info("Ignoring the exception, let normal processing handle it correctly", e);
+                }
+            }
+        }
         return new QualifiedObjectName(catalogName, schemaName, objectName);
     }
 
@@ -256,6 +308,17 @@ public final class MetadataUtil
         public ConnectorTableMetadata build()
         {
             return new ConnectorTableMetadata(tableName, columns.build(), properties.build(), comment);
+        }
+    }
+
+    public static String parseTableIdentifier(String tableIdentifier)
+    {
+        Matcher match = TABLE_PATTERN.matcher(tableIdentifier);
+        if (match.matches()) {
+            return match.group("table");
+        }
+        else {
+            return tableIdentifier;
         }
     }
 }
