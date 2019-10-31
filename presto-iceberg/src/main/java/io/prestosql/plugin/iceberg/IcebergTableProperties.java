@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.plugin.iceberg.IcebergSchemaProperties.LOCATION_PROPERTY;
 import static io.prestosql.spi.session.PropertyMetadata.enumProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -33,8 +34,7 @@ import static java.util.Locale.ENGLISH;
 public class IcebergTableProperties
 {
     public static final String FILE_FORMAT_PROPERTY = "format";
-    public static final String PARTITIONING_PROPERTY = "partitioning";
-    public static final String LOCATION_PROPERTY = "location";
+    public static final String PARTITIONING_PROPERTY = "partitioned_by";
 
     private final List<PropertyMetadata<?>> tableProperties;
 

@@ -564,11 +564,11 @@ public class ThriftHiveMetastore
                     .stopOn(NoSuchObjectException.class, InvalidObjectException.class, MetaException.class, InvalidInputException.class)
                     .stopOnIllegalExceptions()
                     .run("setTableColumnStatistics", stats.getSetTableColumnStatistics().wrap(() -> {
-                        setColumnStatistics(
-                                identity,
-                                format("table %s.%s", databaseName, tableName),
-                                statistics,
-                                (client, stats) -> client.setTableColumnStatistics(databaseName, tableName, stats));
+//                        setColumnStatistics(
+//                                identity,
+//                                format("table %s.%s", databaseName, tableName),
+//                                statistics,
+//                                (client, stats) -> client.setTableColumnStatistics(databaseName, tableName, stats));
                         return null;
                     }));
         }
@@ -591,7 +591,7 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("deleteTableColumnStatistics", stats.getDeleteTableColumnStatistics().wrap(() -> {
                         try (ThriftMetastoreClient client = createMetastoreClient(identity)) {
-                            client.deleteTableColumnStatistics(databaseName, tableName, columnName);
+                            // client.deleteTableColumnStatistics(databaseName, tableName, columnName);
                         }
                         return null;
                     }));
@@ -658,11 +658,11 @@ public class ThriftHiveMetastore
                     .stopOn(NoSuchObjectException.class, InvalidObjectException.class, MetaException.class, InvalidInputException.class)
                     .stopOnIllegalExceptions()
                     .run("setPartitionColumnStatistics", stats.getSetPartitionColumnStatistics().wrap(() -> {
-                        setColumnStatistics(
-                                identity,
-                                format("partition of table %s.%s", databaseName, tableName),
-                                statistics,
-                                (client, stats) -> client.setPartitionColumnStatistics(databaseName, tableName, partitionName, stats));
+//                        setColumnStatistics(
+//                                identity,
+//                                format("partition of table %s.%s", databaseName, tableName),
+//                                statistics,
+//                                (client, stats) -> client.setPartitionColumnStatistics(databaseName, tableName, partitionName, stats));
                         return null;
                     }));
         }
@@ -685,7 +685,7 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("deletePartitionColumnStatistics", stats.getDeletePartitionColumnStatistics().wrap(() -> {
                         try (ThriftMetastoreClient client = createMetastoreClient(identity)) {
-                            client.deletePartitionColumnStatistics(databaseName, tableName, partitionName, columnName);
+                            //client.deletePartitionColumnStatistics(databaseName, tableName, partitionName, columnName);
                         }
                         return null;
                     }));

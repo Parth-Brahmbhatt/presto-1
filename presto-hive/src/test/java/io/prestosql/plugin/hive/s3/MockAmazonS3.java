@@ -47,6 +47,7 @@ public class MockAmazonS3
 {
     private int getObjectHttpCode = HTTP_OK;
     private int getObjectMetadataHttpCode = HTTP_OK;
+    private int listObjectHttpCode = HTTP_OK;
     private GetObjectMetadataRequest getObjectMetadataRequest;
     private CannedAccessControlList acl;
     private boolean hasGlacierObjects;
@@ -61,6 +62,11 @@ public class MockAmazonS3
     public void setGetObjectMetadataHttpCode(int getObjectMetadataHttpCode)
     {
         this.getObjectMetadataHttpCode = getObjectMetadataHttpCode;
+    }
+
+    public void setListObjectHttpCode(int listObjectHttpCode)
+    {
+        this.listObjectHttpCode = listObjectHttpCode;
     }
 
     public CannedAccessControlList getAcl()
@@ -122,6 +128,11 @@ public class MockAmazonS3
     public ListObjectsV2Result listObjectsV2(ListObjectsV2Request listObjectsV2Request)
     {
         final String continuationToken = "continue";
+        if (listObjectHttpCode != HTTP_OK) {
+            AmazonS3Exception exception = new AmazonS3Exception("Failing listObject call with " + listObjectHttpCode);
+            exception.setStatusCode(listObjectHttpCode);
+            throw exception;
+        }
 
         ListObjectsV2Result listingV2 = new ListObjectsV2Result();
 

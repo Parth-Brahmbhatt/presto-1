@@ -105,6 +105,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 public class TestPrestoS3FileSystem
 {
@@ -300,6 +301,33 @@ public class TestPrestoS3FileSystem
                 assertEquals(((AmazonS3Exception) expected).getStatusCode(), HTTP_INTERNAL_ERROR);
                 assertEquals(PrestoS3FileSystem.getFileSystemStats().getReadRetries().getTotalCount(), maxRetries);
                 assertEquals(PrestoS3FileSystem.getFileSystemStats().getGetObjectRetries().getTotalCount(), (maxRetries + 1L) * maxRetries);
+            }
+        }
+    }
+
+    @SuppressWarnings({"ResultOfMethodCallIgnored", "OverlyStrongTypeCast", "ConstantConditions"})
+    @Test
+    public void testListRetryConters()
+            throws Exception
+    {
+        try (PrestoS3FileSystem fs = new PrestoS3FileSystem()) {
+            int maxRetries = 2;
+            MockAmazonS3 s3 = new MockAmazonS3();
+            s3.setListObjectHttpCode(HTTP_INTERNAL_ERROR);
+            Configuration configuration = new Configuration();
+            configuration.set(S3_MAX_BACKOFF_TIME, "1ms");
+            configuration.set(S3_MAX_RETRY_TIME, "5s");
+            configuration.setInt(S3_MAX_CLIENT_RETRIES, maxRetries);
+            fs.initialize(new URI("s3n://test-bucket/"), configuration);
+            fs.setS3Client(s3);
+            try {
+                fs.listStatus(new Path("s3n://test-bucket/test"));
+                fail("should have thrown an exception");
+            }
+            catch (Throwable expected) {
+                assertInstanceOf(expected, AmazonS3Exception.class);
+                assertEquals(((AmazonS3Exception) expected).getStatusCode(), HTTP_INTERNAL_ERROR);
+                assertEquals(PrestoS3FileSystem.getFileSystemStats().getListRetries().getTotalCount(), maxRetries);
             }
         }
     }
