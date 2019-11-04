@@ -651,20 +651,22 @@ public class PrestoS3FileSystem
     {
         try {
             return retry()
-                .maxAttempts(maxAttempts)
-                .exponentialBackoff(BACKOFF_MIN_SLEEP, maxBackoffTime, maxRetryTime, 2.0)
-                .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class)
-                .onRetry(STATS::newListRetry)
-                .run("listS3Object", () -> {
-                    try {
-                        return supplier.get();
-                    }
-                    catch (RuntimeException e) {
-                        STATS.newListObjectErrors();
-                        handleS3Exception(e, path);
-                        throw e;
-                    }
-                });
+                    .maxAttempts(maxAttempts)
+                    .exponentialBackoff(BACKOFF_MIN_SLEEP, maxBackoffTime, maxRetryTime, 2.0)
+                    .stopOn(InterruptedException.class, UnrecoverableS3OperationException.class)
+                    .onRetry(STATS::newListRetry)
+                    .run("listS3Object", () -> {
+                        try {
+                            return supplier.get();
+                        }
+                        catch (RuntimeException e) {
+                            STATS.newListObjectErrors();
+                            if (handleS3Exception(e, path) == null) {
+                                return null;
+                            }
+                            throw e; // unreachable
+                        }
+                    });
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -793,8 +795,10 @@ public class PrestoS3FileSystem
                         }
                         catch (RuntimeException e) {
                             STATS.newGetMetadataError();
-                            handleS3Exception(e, path);
-                            throw e;
+                            if (handleS3Exception(e, path) == null) {
+                                return null;
+                            }
+                            throw e; //unreachable
                         }
                     });
         }
