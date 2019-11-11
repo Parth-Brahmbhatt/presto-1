@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
+import org.apache.hadoop.hive.serde.serdeConstants;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -86,9 +87,11 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 
 public final class MetastoreUtil
 {
-    private static final String HIVE_PARTITION_VALUE_WILDCARD = "";
+    public static final String COLELCTION_DELIM = "colelction.delim";
 
-    private MetastoreUtil() {}
+    private MetastoreUtil()
+    {
+    }
 
     public static Properties getHiveSchema(Table table)
     {
@@ -147,6 +150,11 @@ public final class MetastoreUtil
         for (Map.Entry<String, String> param : sd.getSerdeParameters().entrySet()) {
             schema.setProperty(param.getKey(), (param.getValue() != null) ? param.getValue() : "");
         }
+
+        if (schema.getProperty(COLELCTION_DELIM) != null) {
+            schema.setProperty(serdeConstants.COLLECTION_DELIM, schema.getProperty(COLELCTION_DELIM));
+        }
+
         schema.setProperty(SERIALIZATION_LIB, sd.getStorageFormat().getSerDe());
 
         StringBuilder columnNameBuilder = new StringBuilder();
