@@ -312,16 +312,16 @@ public final class NetflixDateFunctions
     private static long getEpochMs(long value)
     {
         int length = (int) (Math.log10(value) + 1);
-        if (length == 10) {
+        if (length <= 11) {
             // Epoch seconds
             return value * 1000L;
         }
-        else if (length == 13) {
+        else if (length >= 12 && length <= 14) {
             // Epoch milliseconds
             return value;
         }
         else {
-            throw new IllegalArgumentException("Only 10 (epoch) or 13 (epochMs) digit numbers are accepted.");
+            throw new IllegalArgumentException("Invalid epoch seconds or milliseconds.");
         }
     }
 
