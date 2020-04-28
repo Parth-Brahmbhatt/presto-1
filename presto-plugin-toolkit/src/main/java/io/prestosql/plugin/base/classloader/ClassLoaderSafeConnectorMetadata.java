@@ -15,6 +15,7 @@ package io.prestosql.plugin.base.classloader;
 
 import io.airlift.slice.Slice;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.connector.AggregatePushdownResult;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -42,6 +43,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.expression.ConnectorExpression;
+import io.prestosql.spi.function.AggregateFunction;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.security.GrantInfo;
 import io.prestosql.spi.security.PrestoPrincipal;
@@ -676,6 +678,14 @@ public class ClassLoaderSafeConnectorMetadata
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.applyProjection(session, table, projections, assignments);
+        }
+    }
+
+    @Override
+    public Optional<AggregatePushdownResult<ConnectorTableHandle>> applyAggregation(ConnectorSession session, ConnectorTableHandle handle, List<AggregateFunction> aggregates, Optional<List<ConnectorExpression>> projections, Map<String, ColumnHandle> assignments, Optional<List<List<ConnectorExpression>>> groupBy)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.applyAggregation(session, handle, aggregates, projections, assignments, groupBy);
         }
     }
 

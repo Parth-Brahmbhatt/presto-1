@@ -16,6 +16,7 @@ package io.prestosql.spi.connector;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.expression.ConnectorExpression;
+import io.prestosql.spi.function.AggregateFunction;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.security.GrantInfo;
 import io.prestosql.spi.security.PrestoPrincipal;
@@ -810,6 +811,76 @@ public interface ConnectorMetadata
      * </pre>
      */
     default Optional<ProjectionApplicationResult<ConnectorTableHandle>> applyProjection(ConnectorSession session, ConnectorTableHandle handle, List<ConnectorExpression> projections, Map<String, ColumnHandle> assignments)
+    {
+        return Optional.empty();
+    }
+
+    /***
+     * Attempt to push down the aggregates into the table.
+     * <p>
+     * Connectors can indicate whether they don't support aggregate pushdown or that the action had no effect
+     * by returning {@link Optional#empty()}. Connectors should expect this method to be called multiple times
+     * during the optimization of a given query.
+     * <p>
+     * <b>Note</b>: it's critical for connectors to return Optional.empty() if calling this method has no effect for that
+     * invocation, even if the connector generally supports pushdown. Doing otherwise can cause the optimizer
+     * to loop indefinitely.
+     * </p>
+     * <p>
+     * If the method returns a result, the list of assignment and projections in the result will replace the existing
+     * projection and assignments.
+     * <p>
+     * As an example, given the following plan:
+     *
+     * <pre>
+     *
+     *  - aggregate
+     *          v0 = agg_fn1(a)
+     *          v1 = agg_fn2(b, 2)
+     *          v2 = group_by c
+     *      - project
+     *          a
+     *          b
+     *          c
+     *          - scan (TH0)
+     *              a = CH0
+     *              b = CH1
+     *              c = CH2
+     * </pre>
+     * <p>
+     * The optimizer would call {@link #applyAggregation} with the following arguments:
+     *
+     * <pre>
+     * handle = TH0
+     * aggregates = [agg_fn1 (input=[a]), agg_fn2(input=[b,2])]
+     * group_by=[c]
+     * </pre>
+     * <p>
+     * Assuming the connector knows how to handle agg_fn1(...) and agg_fn2(...), it would return:
+     *
+     * <pre>
+     * handle = TH1
+     * projections = [
+     *     v0
+     *     v1
+     *     v2
+     * ]
+     * assignments = [
+     *     v0 = CH0 (synthetic column for agg_fn1(a))
+     *     v1 = CH1 (synthetic column for agg_fn2(b,2))
+     *     v2 = CH3
+     * ]
+     * </pre>
+     * @param session
+     * @param handle
+     * @param aggregates
+     * @param projections
+     * @param assignments
+     * @param groupBy
+     * @return
+     */
+    default Optional<AggregatePushdownResult<ConnectorTableHandle>> applyAggregation(ConnectorSession session, ConnectorTableHandle handle, List<AggregateFunction> aggregates,
+            Optional<List<ConnectorExpression>> projections, Map<String, ColumnHandle> assignments, Optional<List<List<ConnectorExpression>>> groupBy)
     {
         return Optional.empty();
     }
