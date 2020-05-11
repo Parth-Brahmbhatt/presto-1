@@ -15,6 +15,8 @@ package io.prestosql.plugin.base.classloader;
 
 import io.airlift.slice.Slice;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.connector.AggregateFunction;
+import io.prestosql.spi.connector.AggregationPushdownResult;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -684,6 +686,18 @@ public class ClassLoaderSafeConnectorMetadata
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.applySample(session, table, sampleType, sampleRatio);
+        }
+    }
+
+    @Override
+    public Optional<AggregationPushdownResult<ConnectorTableHandle>> applyAggregation(ConnectorSession session,
+            ConnectorTableHandle table,
+            List<AggregateFunction> aggregates,
+            Map<String, ColumnHandle> assignments,
+            List<List<ColumnHandle>> groupBy)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.applyAggregation(session, table, aggregates, assignments, groupBy);
         }
     }
 

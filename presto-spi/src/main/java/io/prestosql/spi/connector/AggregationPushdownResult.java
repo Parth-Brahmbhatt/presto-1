@@ -15,21 +15,23 @@ package io.prestosql.spi.connector;
 
 import io.prestosql.spi.expression.ConnectorExpression;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
-public class ProjectionApplicationResult<T>
+public class AggregationPushdownResult<T>
 {
     private final T handle;
     private final List<ConnectorExpression> projections;
     private final List<Assignment> assignments;
 
-    public ProjectionApplicationResult(T handle, List<ConnectorExpression> projections, List<Assignment> assignments)
+    public AggregationPushdownResult(T handle, List<ConnectorExpression> projections, List<Assignment> assignments)
     {
         this.handle = requireNonNull(handle, "handle is null");
-        this.projections = List.copyOf(requireNonNull(projections, "projections is null"));
-        this.assignments = List.copyOf(requireNonNull(assignments, "assignments is null"));
+        this.projections = unmodifiableList(new ArrayList<>(requireNonNull(projections, "projections is null")));
+        this.assignments = unmodifiableList(new ArrayList<>(requireNonNull(assignments, "assignment is null")));
     }
 
     public T getHandle()

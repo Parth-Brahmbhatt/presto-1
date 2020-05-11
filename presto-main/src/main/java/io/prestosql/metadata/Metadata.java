@@ -22,6 +22,8 @@ import io.prestosql.operator.window.WindowFunctionSupplier;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.block.BlockEncodingSerde;
+import io.prestosql.spi.connector.AggregateFunction;
+import io.prestosql.spi.connector.AggregationPushdownResult;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -351,6 +353,12 @@ public interface Metadata
     Optional<ProjectionApplicationResult<TableHandle>> applyProjection(Session session, TableHandle table, List<ConnectorExpression> projections, Map<String, ColumnHandle> assignments);
 
     Optional<TableHandle> applySample(Session session, TableHandle table, SampleType sampleType, double sampleRatio);
+
+    Optional<AggregationPushdownResult<TableHandle>> applyAggregation(Session session,
+            TableHandle table,
+            List<AggregateFunction> aggregations,
+            Map<String, ColumnHandle> assignments,
+            List<List<ColumnHandle>> groupBy);
 
     default void validateScan(Session session, TableHandle table) {}
 
