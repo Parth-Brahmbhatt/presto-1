@@ -694,6 +694,36 @@ public final class NetflixDateFunctions
         }, null);
     }
 
+    @ScalarFunction("nf_from_unixtime_tz_format")
+    @Description("Convert epoch seconds or ms to timestamp in a given timezone and display in a specified format")
+    @SqlType(VARCHAR)
+    @SqlNullable
+    public static Slice nfFromUnixTimeTzFormat(ConnectorSession session,
+                                              @SqlType(BIGINT) long epoch,
+                                              @SqlType(VARCHAR) Slice timezone,
+                                              @SqlType (VARCHAR) Slice format)
+    {
+        return handleExceptions(() -> {
+            return io.prestosql.operator.scalar.timestamptz.FormatDateTime.format(session,
+                packDateTimeWithZone(getEpochMs(epoch), timezone.toStringUtf8()), format);
+        }, null);
+    }
+
+    @ScalarFunction("nf_from_unixtime_ms_tz_format")
+    @Description("Convert epoch milli seconds to timestamp in a given timezone and display in a specified format")
+    @SqlType(VARCHAR)
+    @SqlNullable
+    public static Slice nfFromUnixTimeMsTzFormat(ConnectorSession session,
+                                               @SqlType(BIGINT) long epochMillis,
+                                               @SqlType(VARCHAR) Slice timezone,
+                                               @SqlType (VARCHAR) Slice format)
+    {
+        return handleExceptions(() -> {
+            return io.prestosql.operator.scalar.timestamptz.FormatDateTime.format(session,
+                packDateTimeWithZone(epochMillis, timezone.toStringUtf8()), format);
+        }, null);
+    }
+
     @ScalarFunction("nf_datestr")
     @Description("Returns the string value if it is a valid date in ‘yyyy-MM-dd’ or 'yyyyMMdd' format")
     @SqlType(VARCHAR)

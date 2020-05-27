@@ -177,7 +177,9 @@ public class TestNetflixDateFunctions
         assertFunction("nf_from_unixtime_tz(1527745543, '+05:00')", TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3), toTimestampWithTimeZone(expected));
         expected = new DateTime(2018, 5, 31, 7, 45, 43, DateTimeZone.forID("Europe/Paris"));
         assertFunction("nf_from_unixtime_ms_tz(1527745543000, 'Europe/Paris')", TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3), toTimestampWithTimeZone(expected));
-    }
+        assertFunction("nf_from_unixtime_ms_tz_format(1527745543000, 'Europe/Paris', 'yyyy-MM-dd HH:mm:ss.SSSZZ')", VarcharType.VARCHAR, "2018-05-31 07:45:43.000+02:00");
+        assertFunction("nf_from_unixtime_tz_format(1527745543, 'Europe/Paris', 'yyyy-MM-dd HH:mm:ss.SSSZZ')", VarcharType.VARCHAR, "2018-05-31 07:45:43.000+02:00");
+   }
 
     @Test
     public void testNfDate()
