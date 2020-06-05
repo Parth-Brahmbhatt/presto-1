@@ -650,6 +650,28 @@ public final class NetflixDateFunctions
         }, null);
     }
 
+    @ScalarFunction("nf_from_unixtime")
+    @Description("Convert epoch seconds or milliseconds from a given reference epoch to timestamp")
+    @SqlType("timestamp(3)")
+    @SqlNullable
+    public static Long nfFromUnixTime(ConnectorSession session, @SqlType(BIGINT) long epoch, @SqlType(BIGINT) long referenceEpoch)
+    {
+        return handleExceptions(() -> {
+            return scaleEpochMillisToMicros(getEpochMs(epoch) + getEpochMs(referenceEpoch));
+        }, null);
+    }
+
+    @ScalarFunction("nf_from_unixtime")
+    @Description("Convert epoch seconds or milliseconds from a given reference epoch to timestamp in a given format")
+    @SqlType(VARCHAR)
+    @SqlNullable
+    public static Slice nfFromUnixTime(ConnectorSession session, @SqlType(BIGINT) long epoch, @SqlType(BIGINT) long referenceEpoch, @SqlType(VARCHAR) Slice format)
+    {
+        return handleExceptions(() -> {
+            return nfFromUnixTimeMs(session, getEpochMs(epoch) + getEpochMs(referenceEpoch), format);
+        }, null);
+    }
+
     @ScalarFunction("nf_from_unixtime_ms")
     @Description("Convert epoch milliseconds to timestamp.")
     @SqlType("timestamp(3)")
@@ -669,6 +691,28 @@ public final class NetflixDateFunctions
             DateTimeFormatter df = DateTimeFormat.forPattern(format.toStringUtf8())
                     .withChronology(getChronology(session.getTimeZoneKey()));
             return utf8Slice(df.print(epochMilliSeconds));
+        }, null);
+    }
+
+    @ScalarFunction("nf_from_unixtime_ms")
+    @Description("Convert epoch ms from a given reference epoch to timestamp")
+    @SqlType("timestamp(3)")
+    @SqlNullable
+    public static Long nfFromUnixTimeMs(ConnectorSession session, @SqlType(BIGINT) long epoch, @SqlType(BIGINT) long referenceEpoch)
+    {
+        return handleExceptions(() -> {
+            return scaleEpochMillisToMicros(epoch + referenceEpoch);
+        }, null);
+    }
+
+    @ScalarFunction("nf_from_unixtime_ms")
+    @Description("Convert milliseconds from a given reference epoch to timestamp in a given format")
+    @SqlType(VARCHAR)
+    @SqlNullable
+    public static Slice nfFromUnixTimeMs(ConnectorSession session, @SqlType(BIGINT) long epoch, @SqlType(BIGINT) long referenceEpoch, @SqlType(VARCHAR) Slice format)
+    {
+        return handleExceptions(() -> {
+            return nfFromUnixTimeMs(session, epoch + referenceEpoch, format);
         }, null);
     }
 

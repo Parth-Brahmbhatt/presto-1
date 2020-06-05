@@ -173,6 +173,10 @@ public class TestNetflixDateFunctions
         assertFunction("nf_from_unixtime(1527745543, 'yyyy/MM/dd')", VarcharType.VARCHAR, res);
         assertFunction("nf_from_unixtime(1527750000)", TIMESTAMP_MILLIS, toTimestamp(TIMESTAMP_6));
         assertFunction("nf_from_unixtime(1527794421010)", TIMESTAMP_MILLIS, toTimestamp(TIMESTAMP_7));
+        assertFunction("nf_from_unixtime(549442800, 978307200)", TIMESTAMP_MILLIS, toTimestamp(TIMESTAMP_6));
+        assertFunction("nf_from_unixtime_ms(549487221010, 978307200000)", TIMESTAMP_MILLIS, toTimestamp(TIMESTAMP_7));
+        assertFunction("nf_from_unixtime(549442800, 978307200, 'yyyy/MM/dd')", VarcharType.VARCHAR, "2018/05/31");
+        assertFunction("nf_from_unixtime_ms(549487221010, 978307200000, 'yyyy-MM-dd HH:mm:ss.SSS')", VarcharType.VARCHAR, toTimestamp(TIMESTAMP_7).toString());
         DateTime expected = new DateTime(2018, 5, 31, 10, 45, 43, DateTimeZone.forID("+05:00"));
         assertFunction("nf_from_unixtime_tz(1527745543, '+05:00')", TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3), toTimestampWithTimeZone(expected));
         expected = new DateTime(2018, 5, 31, 7, 45, 43, DateTimeZone.forID("Europe/Paris"));
