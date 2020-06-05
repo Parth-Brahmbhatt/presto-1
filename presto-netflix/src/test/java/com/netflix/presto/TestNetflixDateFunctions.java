@@ -350,6 +350,21 @@ public class TestNetflixDateFunctions
     }
 
     @Test
+    public void testNfDayOfWeek()
+    {
+        assertFunction("nf_day_of_week(20180603)", IntegerType.INTEGER, 7);
+        assertFunction("nf_day_of_week('20180603')", IntegerType.INTEGER, 7);
+        assertFunction("nf_day_of_week('2018-06-03')", IntegerType.INTEGER, 7);
+        assertFunction("nf_day_of_week(1591045342000)", IntegerType.INTEGER, 1);
+        assertFunction("nf_day_of_week(1591045342)", IntegerType.INTEGER, 1);
+        assertFunction("nf_day_of_week(date '2018-06-03')", IntegerType.INTEGER, 7);
+        assertFunction("nf_day_of_week('2020-06-01T12:20:21.010')", IntegerType.INTEGER, 1);
+        assertFunction("nf_day_of_week('2020-06-01 12:20:21.010')", IntegerType.INTEGER, 1);
+        assertFunction("nf_day_of_week(timestamp '2018-01-01 00:00:00.000')", IntegerType.INTEGER, 1);
+        assertFunction("nf_day_of_week(null)", IntegerType.INTEGER, null);
+    }
+
+    @Test
     public void testNfWeek()
     {
         int week = 22;

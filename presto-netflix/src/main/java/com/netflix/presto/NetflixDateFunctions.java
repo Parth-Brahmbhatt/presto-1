@@ -18,6 +18,7 @@ import io.prestosql.operator.scalar.timestamp.DateAdd;
 import io.prestosql.operator.scalar.timestamp.DateDiff;
 import io.prestosql.operator.scalar.timestamp.DateTrunc;
 import io.prestosql.operator.scalar.timestamp.ExtractDay;
+import io.prestosql.operator.scalar.timestamp.ExtractDayOfWeek;
 import io.prestosql.operator.scalar.timestamp.ExtractHour;
 import io.prestosql.operator.scalar.timestamp.ExtractMinute;
 import io.prestosql.operator.scalar.timestamp.ExtractMonth;
@@ -54,6 +55,7 @@ import java.util.regex.Pattern;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.operator.scalar.DateTimeFunctions.addFieldValueDate;
 import static io.prestosql.operator.scalar.DateTimeFunctions.dayFromDate;
+import static io.prestosql.operator.scalar.DateTimeFunctions.dayOfWeekFromDate;
 import static io.prestosql.operator.scalar.DateTimeFunctions.diffDate;
 import static io.prestosql.operator.scalar.DateTimeFunctions.monthFromDate;
 import static io.prestosql.operator.scalar.DateTimeFunctions.quarterFromDate;
@@ -1872,7 +1874,7 @@ public final class NetflixDateFunctions
     @Description("Extracts day as an integer from date")
     @SqlType(StandardTypes.INTEGER)
     @SqlNullable
-    public static Long nfDatDate(@SqlType(DATE) long date)
+    public static Long nfDayDate(@SqlType(DATE) long date)
     {
         return handleExceptions(() -> {
             return dayFromDate(date);
@@ -1900,6 +1902,72 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             return io.prestosql.operator.scalar.timestamptz.ExtractDay.extract(timestamp);
+        }, null);
+    }
+
+    @ScalarFunction("nf_day_of_week")
+    @Description("Extracts day of week as an integer from dateint")
+    @SqlType(StandardTypes.INTEGER)
+    @SqlNullable
+    public static Long nfDayOfWeekDateInt(ConnectorSession session, @SqlType(BIGINT) long dateint)
+    {
+        return handleExceptions(() -> {
+            if (dateint > DATE_INT_MAX_THRESHOLD) {
+                return ExtractDayOfWeek.extract(getEpochMs(dateint));
+            }
+            return dayOfWeekFromDate(nfDateInttoDate(session, dateint));
+        }, null);
+    }
+
+    @ScalarFunction("nf_day_of_week")
+    @Description("Extracts day of week as an integer from datestr")
+    @SqlType(StandardTypes.INTEGER)
+    @SqlNullable
+    public static Long nfDayOfWeekDateStr(ConnectorSession session, @SqlType(VARCHAR) Slice dateStr)
+    {
+        return handleExceptions(() -> {
+            if (dateStr.length() == 8 || dateStr.length() == 10) {
+                return dayOfWeekFromDate(nfDate(session, dateStr));
+            }
+            else {
+                long timestamp = stringToTimestamp(dateStr.toStringUtf8(), TimeZone.getTimeZone(session.getTimeZoneKey().getId())) / 1000L;
+                return ExtractDayOfWeek.extract(timestamp);
+            }
+        }, null);
+    }
+
+    @ScalarFunction("nf_day_of_week")
+    @Description("Extracts day of week as an integer from date")
+    @SqlType(StandardTypes.INTEGER)
+    @SqlNullable
+    public static Long nfDayOfWeekDate(@SqlType(DATE) long date)
+    {
+        return handleExceptions(() -> {
+            return dayOfWeekFromDate(date);
+        }, null);
+    }
+
+    @ScalarFunction("nf_day_of_week")
+    @Description("Extracts day of week as an integer from timestamp")
+    @SqlType(StandardTypes.INTEGER)
+    @SqlNullable
+    @LiteralParameters("p")
+    public static Long nfDayOfWeekTimestamp(ConnectorSession session, @SqlType("timestamp(p)") long timestamp)
+    {
+        return handleExceptions(() -> {
+            return ExtractDayOfWeek.extract(timestamp);
+        }, null);
+    }
+
+    @ScalarFunction("nf_day_of_week")
+    @Description("Extracts day of week as an integer from timestamp with timezone")
+    @SqlType(StandardTypes.INTEGER)
+    @SqlNullable
+    @LiteralParameters("p")
+    public static Long nfDayOfWeekTimestampWithTimezone(@SqlType("timestamp(p) with time zone") long timestamp)
+    {
+        return handleExceptions(() -> {
+            return io.prestosql.operator.scalar.timestamptz.ExtractDayOfWeek.extract(timestamp);
         }, null);
     }
 
