@@ -14,6 +14,7 @@
 package io.trino.sql.query;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Range;
 import io.trino.Session;
 import io.trino.cost.PlanNodeStatsEstimate;
 import io.trino.execution.warnings.WarningCollector;
@@ -43,6 +44,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -55,6 +57,7 @@ import static io.trino.transaction.TransactionBuilder.transaction;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 public class QueryAssertions
@@ -251,6 +254,7 @@ public class QueryAssertions
         private final String query;
         private boolean ordered;
         private boolean skipTypesCheck;
+        private List<Double> tolerancePercentages;
 
         static AssertProvider<QueryAssert> newQueryAssert(String query, QueryRunner runner, Session session)
         {
@@ -278,6 +282,18 @@ public class QueryAssertions
             return this;
         }
 
+        /**
+         * Each element in index represents allowed tolerance percentage for that column, if tolerance is 0, null or not
+         * provided (i.e. results have 5 column but this list only has 3 values) for a column index than only exact matches will be done.
+         * @param tolerancePercentages
+         * @return
+         */
+        public QueryAssert withTolerancePercentages(List<Double> tolerancePercentages)
+        {
+            this.tolerancePercentages = tolerancePercentages;
+            return this;
+        }
+
         public QueryAssert skippingTypesCheck()
         {
             skipTypesCheck = true;
@@ -301,8 +317,22 @@ public class QueryAssertions
                         .as("Rows")
                         .withRepresentation(ROWS_REPRESENTATION);
 
+                if (!ordered && tolerancePercentages != null) {
+                    throw new UnsupportedOperationException("can not support inexact matches with unordered results.");
+                }
+
                 if (ordered) {
-                    assertion.containsExactlyElementsOf(expected.getMaterializedRows());
+                    if (tolerancePercentages != null) {
+                        IntStream.range(0, actual.getRowCount())
+                                .forEach(row -> {
+                                    MaterializedRow actualRow = actual.getMaterializedRows().get(row);
+                                    MaterializedRow expectedRow = expected.getMaterializedRows().get(row);
+                                    matchWithTolerance(actualRow, expectedRow, tolerancePercentages);
+                                });
+                    }
+                    else {
+                        assertion.containsExactlyElementsOf(expected.getMaterializedRows());
+                    }
                 }
                 else {
                     assertion.containsExactlyInAnyOrderElementsOf(expected.getMaterializedRows());
@@ -353,6 +383,32 @@ public class QueryAssertions
                     .isEqualTo(expectedTypes);
         }
 
+        private void matchWithTolerance(MaterializedRow actualRow, MaterializedRow expectedRow, List<Double> tolerancePercentages)
+        {
+            assertEquals(actualRow.getFieldCount(), expectedRow.getFieldCount());
+
+            IntStream.range(0, actualRow.getFieldCount())
+                    .forEach(fieldIndex -> {
+                        Object actualRowField = actualRow.getField(fieldIndex);
+                        Object expectedRowField = expectedRow.getField(fieldIndex);
+
+                        if (tolerancePercentages.size() >= fieldIndex && tolerancePercentages.get(fieldIndex) != null) {
+                            Double tolerance = tolerancePercentages.get(fieldIndex);
+                            assertTrue(expectedRowField instanceof Number && expectedRowField instanceof Comparable,
+                                    "tolerance is specified for the column but column is not a number and comparable " + expectedRowField);
+
+                            Double percentageValue = (((Number) expectedRowField).doubleValue() * tolerance) / 100;
+                            Range range = Range.open(((Number) expectedRowField).doubleValue() - percentageValue, ((Number) expectedRowField).doubleValue() + percentageValue);
+                            if (!range.contains(((Number) actualRowField).doubleValue())) {
+                                fail("row " + actualRow + " has field " + actualRowField + " that is not contained in expected actual range " + range);
+                            }
+                        }
+                        else {
+                            assertEquals(actualRow, expectedRow);
+                        }
+                    });
+        }
+
         public QueryAssert returnsEmptyResult()
         {
             return satisfies(actual -> {
@@ -364,6 +420,14 @@ public class QueryAssertions
          * Verifies query is fully pushed down and verifies the results are the same as when the pushdown is disabled.
          */
         public QueryAssert isFullyPushedDown()
+        {
+            return isCorrectlyPushedDown();
+        }
+
+        /**
+         * Verifies query is fully pushed down and verifies the results are the same as when the pushdown is disabled.
+         */
+        public QueryAssert isCorrectlyPushedDown()
         {
             checkState(!(runner instanceof LocalQueryRunner), "testIsFullyPushedDown() currently does not work with LocalQueryRunner");
 
