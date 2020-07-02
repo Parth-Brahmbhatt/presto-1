@@ -14,11 +14,14 @@
 package io.prestosql.plugin.druid;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import io.prestosql.plugin.druid.aggregate.SingleInputAggregateFunction;
 import io.prestosql.plugin.jdbc.BaseJdbcClient;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ColumnMapping;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
+import io.prestosql.plugin.jdbc.JdbcExpression;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcOutputTableHandle;
 import io.prestosql.plugin.jdbc.JdbcSplit;
@@ -26,10 +29,18 @@ import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.QueryBuilder;
 import io.prestosql.plugin.jdbc.RemoteTableName;
+import io.prestosql.plugin.jdbc.expression.AggregateFunctionRewriter;
+import io.prestosql.plugin.jdbc.expression.AggregateFunctionRule;
+import io.prestosql.plugin.jdbc.expression.ImplementCount;
+import io.prestosql.plugin.jdbc.expression.ImplementCountAll;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.AggregateFunction;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
 import javax.inject.Inject;
@@ -43,8 +54,10 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -52,6 +65,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
@@ -64,11 +80,83 @@ public class DruidJdbcClient
     private static final String DRUID_CATALOG = "druid";
     // All the datasources in Druid are created under schema "druid"
     public static final String DRUID_SCHEMA = "druid";
+    private AggregateFunctionRewriter aggregateFunctionRewriter;
 
     @Inject
     public DruidJdbcClient(BaseJdbcConfig config, ConnectionFactory connectionFactory)
     {
         super(config, "\"", connectionFactory);
+        Optional<JdbcTypeHandle> bigIntHandle = Optional.of(new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), 0, 0, Optional.empty(), Optional.empty()));
+        Optional<JdbcTypeHandle> doubleHandle = Optional.of(new JdbcTypeHandle(Types.DOUBLE, Optional.of("double"), 0, 0, Optional.empty(), Optional.empty()));
+        Set<Type> druidNumericTypes = Set.of(DOUBLE, BIGINT, REAL);
+        Set<Type> numericAndTimeStampType = Set.of(DOUBLE, BIGINT, REAL, TimestampType.createTimestampType(3));
+
+        this.aggregateFunctionRewriter = new AggregateFunctionRewriter(
+                this::quoted,
+                ImmutableSet.<AggregateFunctionRule>builder()
+                        .add(new ImplementCountAll(bigIntHandle.get()))
+                        .add(new ImplementCount(bigIntHandle.get()))
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("approx_distinct")
+                                .druidName(Optional.of("approx_count_distinct"))
+                                .jdbcTypeHandle(bigIntHandle)
+                                .outputType(Optional.of(BIGINT))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("max")
+                                .inputTypes(numericAndTimeStampType)
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("min")
+                                .inputTypes(numericAndTimeStampType)
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("sum")
+                                .inputTypes(druidNumericTypes)
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("avg")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("stddev")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("stddev_pop")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("stddev_samp")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("variance")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("var_pop")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("var_samp")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .build());
     }
 
     @Override
@@ -145,6 +233,12 @@ public class DruidJdbcClient
                 return Optional.of(varcharColumnMapping(createVarcharType(columnSize)));
         }
         return super.toPrestoType(session, connection, typeHandle);
+    }
+
+    @Override
+    public Optional<JdbcExpression> implementAggregation(ConnectorSession session, AggregateFunction aggregate, Map<String, ColumnHandle> assignments)
+    {
+        return aggregateFunctionRewriter.rewrite(session, aggregate, assignments);
     }
 
     // Druid doesn't like table names to be qualified with catalog names in the SQL query.
