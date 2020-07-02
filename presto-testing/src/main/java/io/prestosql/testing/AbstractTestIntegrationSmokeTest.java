@@ -423,7 +423,11 @@ public abstract class AbstractTestIntegrationSmokeTest
     protected void assertPushedDown(String actual, String expectedOnH2)
     {
         assertQuery(actual, expectedOnH2);
+        assertPushdedDownPlan(actual);
+    }
 
+    protected void assertPushdedDownPlan(String actual)
+    {
         transaction(getQueryRunner().getTransactionManager(), getQueryRunner().getAccessControl())
                 .execute(getSession(), session -> {
                     Plan plan = getQueryRunner().createPlan(session, actual, WarningCollector.NOOP);
