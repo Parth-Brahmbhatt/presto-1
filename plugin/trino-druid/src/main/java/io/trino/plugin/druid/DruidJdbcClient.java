@@ -14,11 +14,14 @@
 package io.trino.plugin.druid;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import io.trino.plugin.druid.aggregate.SingleInputAggregateFunction;
 import io.trino.plugin.jdbc.BaseJdbcClient;
 import io.trino.plugin.jdbc.BaseJdbcConfig;
 import io.trino.plugin.jdbc.ColumnMapping;
 import io.trino.plugin.jdbc.ConnectionFactory;
 import io.trino.plugin.jdbc.JdbcColumnHandle;
+import io.trino.plugin.jdbc.JdbcExpression;
 import io.trino.plugin.jdbc.JdbcNamedRelationHandle;
 import io.trino.plugin.jdbc.JdbcOutputTableHandle;
 import io.trino.plugin.jdbc.JdbcSplit;
@@ -28,10 +31,17 @@ import io.trino.plugin.jdbc.PreparedQuery;
 import io.trino.plugin.jdbc.RemoteTableName;
 import io.trino.plugin.jdbc.WriteFunction;
 import io.trino.plugin.jdbc.WriteMapping;
+import io.trino.plugin.jdbc.expression.AggregateFunctionRewriter;
+import io.trino.plugin.jdbc.expression.AggregateFunctionRule;
+import io.trino.plugin.jdbc.expression.ImplementCount;
+import io.trino.plugin.jdbc.expression.ImplementCountAll;
 import io.trino.spi.TrinoException;
+import io.trino.spi.connector.AggregateFunction;
+import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.Type;
 
 import javax.inject.Inject;
@@ -47,11 +57,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.trino.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
+import static io.trino.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
+import static io.trino.spi.type.BigintType.BIGINT;
+import static io.trino.spi.type.DoubleType.DOUBLE;
+import static io.trino.spi.type.RealType.REAL;
+import static io.trino.spi.type.VarcharType.createUnboundedVarcharType;
+import static io.trino.spi.type.VarcharType.createVarcharType;
 import static io.trino.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
 import static io.trino.plugin.jdbc.StandardColumnMappings.defaultVarcharColumnMapping;
 import static io.trino.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
@@ -67,11 +85,83 @@ public class DruidJdbcClient
     private static final String DRUID_CATALOG = "druid";
     // All the datasources in Druid are created under schema "druid"
     public static final String DRUID_SCHEMA = "druid";
+    private AggregateFunctionRewriter aggregateFunctionRewriter;
 
     @Inject
     public DruidJdbcClient(BaseJdbcConfig config, ConnectionFactory connectionFactory)
     {
         super(config, "\"", connectionFactory);
+        Optional<JdbcTypeHandle> bigIntHandle = Optional.of(new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), 0, 0, Optional.empty(), Optional.empty()));
+        Optional<JdbcTypeHandle> doubleHandle = Optional.of(new JdbcTypeHandle(Types.DOUBLE, Optional.of("double"), 0, 0, Optional.empty(), Optional.empty()));
+        Set<Type> druidNumericTypes = Set.of(DOUBLE, BIGINT, REAL);
+        Set<Type> numericAndTimeStampType = Set.of(DOUBLE, BIGINT, REAL, TimestampType.createTimestampType(3));
+
+        this.aggregateFunctionRewriter = new AggregateFunctionRewriter(
+                this::quoted,
+                ImmutableSet.<AggregateFunctionRule>builder()
+                        .add(new ImplementCountAll(bigIntHandle.get()))
+                        .add(new ImplementCount(bigIntHandle.get()))
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("approx_distinct")
+                                .druidName(Optional.of("approx_count_distinct"))
+                                .jdbcTypeHandle(bigIntHandle)
+                                .outputType(Optional.of(BIGINT))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("max")
+                                .inputTypes(numericAndTimeStampType)
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("min")
+                                .inputTypes(numericAndTimeStampType)
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("sum")
+                                .inputTypes(druidNumericTypes)
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("avg")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("stddev")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("stddev_pop")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("stddev_samp")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("variance")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("var_pop")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .add(SingleInputAggregateFunction.builder()
+                                .prestoName("var_samp")
+                                .jdbcTypeHandle(doubleHandle)
+                                .inputTypes(druidNumericTypes)
+                                .outputType(Optional.of(DOUBLE))
+                                .build())
+                        .build());
     }
 
     @Override
@@ -151,6 +241,14 @@ public class DruidJdbcClient
         return legacyToPrestoType(session, connection, typeHandle);
     }
 
+    @Override
+    public Optional<JdbcExpression> implementAggregation(ConnectorSession session, AggregateFunction aggregate, Map<String, ColumnHandle> assignments)
+    {
+        return aggregateFunctionRewriter.rewrite(session, aggregate, assignments);
+    }
+
+    // Druid doesn't like table names to be qualified with catalog names in the SQL query.
+    // Hence, overriding this method to pass catalog as null.
     @Override
     public WriteMapping toWriteMapping(ConnectorSession session, Type type)
     {

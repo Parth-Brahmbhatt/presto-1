@@ -294,6 +294,52 @@ public abstract class BaseDruidConnectorTest
     }
 
     @Test
+    public void testAggregationPushdown()
+    {
+        assertThat(query("SELECT count(*) FROM orders")).isFullyPushedDown();
+
+        // for varchar only count is pushed down
+        assertThat(query("SELECT count(comment) FROM orders")).isFullyPushedDown();
+
+        // for timestamp
+        assertThat(query("SELECT count(__time) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT min(__time) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT max(__time) FROM orders")).isFullyPushedDown();
+
+        // for double
+        assertThat(query("SELECT count(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT min(totalprice) FROM orders group by custkey")).isFullyPushedDown();
+        assertThat(query("SELECT max(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT sum(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT avg(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT stddev(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT stddev_samp(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT stddev_pop(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT variance(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT var_samp(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT var_pop(totalprice) FROM orders")).isFullyPushedDown();
+
+        // for bigint
+        assertThat(query("SELECT count(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT min(shippriority) FROM orders group by custkey")).isFullyPushedDown();
+        assertThat(query("SELECT max(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT sum(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT avg(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT stddev(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT stddev_samp(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT stddev_pop(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT variance(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT var_samp(shippriority) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT var_pop(shippriority) FROM orders")).isFullyPushedDown();
+
+        // instead of checking for an approximate value just checking for the plan
+        assertThat(query("SELECT approx_distinct(custkey) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT approx_distinct(totalprice) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT approx_distinct(comment) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT approx_distinct(__time) FROM orders")).isFullyPushedDown();
+    }
+
+    @Test
     @Override
     public void testLimitPushDown()
     {
