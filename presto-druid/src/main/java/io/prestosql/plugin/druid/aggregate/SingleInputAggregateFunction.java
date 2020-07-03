@@ -36,10 +36,8 @@ import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.func
 import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.singleInput;
 import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.variable;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
-/**
- * Implements a single input aggregate function
- */
 public class SingleInputAggregateFunction
         implements AggregateFunctionRule
 {
@@ -57,11 +55,11 @@ public class SingleInputAggregateFunction
             Set<Type> inputTypes,
             Optional<Type> outputType)
     {
-        this.prestoName = verifyNotNull(prestoName, "prestoName is null");
-        this.druidName = verifyNotNull(druidName, "druidName is null");
-        this.jdbcTypeHandle = verifyNotNull(jdbcTypeHandle, "jdbcTypeHandle is null");
-        this.inputTypes = verifyNotNull(inputTypes, "inputTypes is null");
-        this.outputType = verifyNotNull(outputType, "outputType is null");
+        this.prestoName = requireNonNull(prestoName, "prestoName is null");
+        this.druidName = requireNonNull(druidName, "druidName is null");
+        this.jdbcTypeHandle = requireNonNull(jdbcTypeHandle, "jdbcTypeHandle is null");
+        this.inputTypes = requireNonNull(inputTypes, "inputTypes is null");
+        this.outputType = requireNonNull(outputType, "outputType is null");
     }
 
     @Override
@@ -113,15 +111,15 @@ public class SingleInputAggregateFunction
             return this;
         }
 
-        public Builder druidName(Optional<String> druidName)
+        public Builder druidName(String druidName)
         {
-            this.druidName = druidName;
+            this.druidName = Optional.of(druidName);
             return this;
         }
 
-        public Builder jdbcTypeHandle(Optional<JdbcTypeHandle> jdbcTypeHandle)
+        public Builder jdbcTypeHandle(JdbcTypeHandle jdbcTypeHandle)
         {
-            this.jdbcTypeHandle = jdbcTypeHandle;
+            this.jdbcTypeHandle = Optional.of(jdbcTypeHandle);
             return this;
         }
 
@@ -131,9 +129,9 @@ public class SingleInputAggregateFunction
             return this;
         }
 
-        public Builder outputType(Optional<Type> outputType)
+        public Builder outputType(Type outputType)
         {
-            this.outputType = outputType;
+            this.outputType = Optional.of(outputType);
             return this;
         }
 
