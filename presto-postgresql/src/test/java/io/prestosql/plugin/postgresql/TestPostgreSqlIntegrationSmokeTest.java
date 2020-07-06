@@ -292,7 +292,6 @@ public class TestPostgreSqlIntegrationSmokeTest
     public void testAggregationPushdown()
             throws Exception
     {
-        // TODO support aggregation pushdown with GROUPING SETS
         // TODO support aggregation over expressions
 
         assertPushedDown("SELECT count(*) FROM nation");
@@ -303,6 +302,11 @@ public class TestPostgreSqlIntegrationSmokeTest
         assertPushedDown(
                 "SELECT regionkey, avg(nationkey) FROM nation GROUP BY regionkey",
                 "SELECT regionkey, avg(CAST(nationkey AS double)) FROM nation GROUP BY regionkey");
+
+        assertPushedDown(
+                "SELECT regionkey, nationkey FROM nation GROUP BY GROUPING SETS ((regionkey), (nationkey))",
+                "SELECT NULL, nationkey FROM nation " +
+                        "UNION ALL SELECT DISTINCT regionkey, NULL FROM nation");
 
         try (AutoCloseable ignoreTable = withTable("tpch.test_aggregation_pushdown", "(short_decimal decimal(9, 3), long_decimal decimal(30, 10))")) {
             execute("INSERT INTO tpch.test_aggregation_pushdown VALUES (100.000, 100000000.000000000)");

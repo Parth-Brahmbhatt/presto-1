@@ -107,7 +107,8 @@ import io.prestosql.sql.planner.iterative.rule.PruneUnnestColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneUnnestSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneValuesColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneWindowColumns;
-import io.prestosql.sql.planner.iterative.rule.PushAggregationIntoTableScan;
+import io.prestosql.sql.planner.iterative.rule.PushAggregationIntoTableScan.PushAggregationIntoTableScanWithGroupingSets;
+import io.prestosql.sql.planner.iterative.rule.PushAggregationIntoTableScan.PushAggregationIntoTableScanWithoutGroupingSets;
 import io.prestosql.sql.planner.iterative.rule.PushAggregationThroughOuterJoin;
 import io.prestosql.sql.planner.iterative.rule.PushDeleteIntoConnector;
 import io.prestosql.sql.planner.iterative.rule.PushDownDereferenceThroughFilter;
@@ -509,7 +510,7 @@ public class PlanOptimizers
                                 .add(new PushLimitIntoTableScan(metadata))
                                 .add(new PushPredicateIntoTableScan(metadata, typeAnalyzer))
                                 .add(new PushSampleIntoTableScan(metadata))
-                                .add(new PushAggregationIntoTableScan(metadata))
+                                .add(new PushAggregationIntoTableScanWithoutGroupingSets(metadata))
                                 .build()),
                 new IterativeOptimizer(
                         ruleStats,
@@ -618,7 +619,8 @@ public class PlanOptimizers
                         new CreatePartialTopN(),
                         new PushTopNThroughProject(),
                         new PushTopNThroughOuterJoin(),
-                        new PushTopNThroughUnion())));
+                        new PushTopNThroughUnion(),
+                        new PushAggregationIntoTableScanWithGroupingSets(metadata))));
         builder.add(new IterativeOptimizer(
                 ruleStats,
                 statsCalculator,
@@ -723,6 +725,11 @@ public class PlanOptimizers
                 statsCalculator,
                 costCalculator,
                 new AddExchangesBelowPartialAggregationOverGroupIdRuleSet(metadata, typeAnalyzer, taskCountEstimator, taskManagerConfig).rules()));
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                Set.of(new PushAggregationIntoTableScanWithGroupingSets(metadata))));
         builder.add(new IterativeOptimizer(
                 ruleStats,
                 statsCalculator,
