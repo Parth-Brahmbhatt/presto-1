@@ -26,7 +26,6 @@ import io.trino.spi.expression.Variable;
 import io.trino.spi.type.Type;
 
 import java.util.Optional;
-import java.util.Set;
 
 import static com.google.common.base.Verify.verifyNotNull;
 import static io.trino.matching.Capture.newCapture;
@@ -45,39 +44,31 @@ public class SingleInputAggregateFunction
     private final String prestoName; // presto aggregate function name to match
     private final Optional<String> druidName; // mapping to druid name if its not same
     private final Optional<JdbcTypeHandle> jdbcTypeHandle; // type handle if its different from input column
-    private Set<Type> inputTypes; // empty if all input types should match, or the set to match
-    private Optional<Type> outputType; // provide if the pattern should only match specific output type
+    private Type inputType; // empty if all input types should match, or the set to match
+    private Type outputType; // provide if the pattern should only match specific output type
 
     public SingleInputAggregateFunction(
             String prestoName,
             Optional<String> druidName,
             Optional<JdbcTypeHandle> jdbcTypeHandle,
-            Set<Type> inputTypes,
-            Optional<Type> outputType)
+            Type inputType,
+            Type outputType)
     {
         this.prestoName = requireNonNull(prestoName, "prestoName is null");
         this.druidName = requireNonNull(druidName, "druidName is null");
         this.jdbcTypeHandle = requireNonNull(jdbcTypeHandle, "jdbcTypeHandle is null");
-        this.inputTypes = requireNonNull(inputTypes, "inputTypes is null");
+        this.inputType = requireNonNull(inputType, "inputType is null");
         this.outputType = requireNonNull(outputType, "outputType is null");
     }
 
     @Override
     public Pattern<AggregateFunction> getPattern()
     {
-        Pattern<AggregateFunction> basePattern = basicAggregation()
-                .with(functionName().equalTo(prestoName));
-        Pattern<AggregateFunction> pattern = outputType
-                .map(type -> basePattern.with(AggregateFunctionPatterns.outputType().equalTo(type)))
-                .orElse(basePattern);
-
-        if (inputTypes.isEmpty()) {
-            return pattern.with(singleInput().matching(variable().capturedAs(INPUT)));
-        }
-        else {
-            return pattern.with(singleInput()
-                    .matching(variable().with(expressionType().matching(type -> inputTypes.contains(type))).capturedAs(INPUT)));
-        }
+        return basicAggregation()
+                .with(functionName().equalTo(prestoName))
+                .with(outputType().equalTo(outputType))
+                .with(singleInput()
+                        .matching(variable().with(expressionType().equalTo(inputType)).capturedAs(INPUT)));
     }
 
     @Override
@@ -102,8 +93,8 @@ public class SingleInputAggregateFunction
         private String prestoName;
         private Optional<String> druidName = Optional.empty();
         private Optional<JdbcTypeHandle> jdbcTypeHandle = Optional.empty();
-        private Set<Type> inputTypes = Set.of();
-        private Optional<Type> outputType = Optional.empty();
+        private Type inputType;
+        private Type outputType;
 
         public Builder prestoName(String prestoName)
         {
@@ -123,21 +114,21 @@ public class SingleInputAggregateFunction
             return this;
         }
 
-        public Builder inputTypes(Set<Type> inputTypes)
+        public Builder inputTypes(Type inputType)
         {
-            this.inputTypes = inputTypes;
+            this.inputType = inputType;
             return this;
         }
 
         public Builder outputType(Type outputType)
         {
-            this.outputType = Optional.of(outputType);
+            this.outputType = outputType;
             return this;
         }
 
         public SingleInputAggregateFunction build()
         {
-            return new SingleInputAggregateFunction(prestoName, druidName, jdbcTypeHandle, inputTypes, outputType);
+            return new SingleInputAggregateFunction(prestoName, druidName, jdbcTypeHandle, inputType, outputType);
         }
     }
 }

@@ -19,15 +19,23 @@ import io.trino.spi.connector.SchemaTableName;
 import io.trino.sql.planner.plan.AggregationNode;
 import io.trino.testing.BaseConnectorTest;
 import io.trino.testing.MaterializedResult;
+import io.trino.testing.QueryRunner;
 import io.trino.testing.TestingConnectorBehavior;
 import io.trino.testing.assertions.Assert;
 import org.intellij.lang.annotations.Language;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import static io.trino.plugin.druid.DruidQueryRunner.copyAndIngestTpchData;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.testing.MaterializedResult.resultBuilder;
+import static io.trino.tpch.TpchTable.CUSTOMER;
+import static io.trino.tpch.TpchTable.LINE_ITEM;
+import static io.trino.tpch.TpchTable.NATION;
+import static io.trino.tpch.TpchTable.ORDERS;
+import static io.trino.tpch.TpchTable.PART;
+import static io.trino.tpch.TpchTable.REGION;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public abstract class BaseDruidConnectorTest
@@ -106,7 +114,34 @@ public abstract class BaseDruidConnectorTest
             "'1995-01-02' AS customer_druid_dummy_ts " +  // Dummy timestamp for Druid __time column
             "FROM tpch.tiny.customer";
 
-    protected TestingDruidServer druidServer;
+    private static final String SELECT_SINGLE_ROW = "SELECT " +
+            "CAST(1 AS DOUBLE), " +
+            "CAST(1 AS REAL), " +
+            "CAST(1 AS BIGINT), " +
+            "'1995-01-02' AS DUMMY_TS ";
+
+    private TestingDruidServer druidServer;
+
+    @Override
+    protected QueryRunner createQueryRunner()
+            throws Exception
+    {
+        this.druidServer = new TestingDruidServer();
+        QueryRunner runner = DruidQueryRunner.createDruidQueryRunnerTpch(druidServer, ImmutableMap.of());
+        copyAndIngestTpchData(runner.execute(SELECT_SINGLE_ROW), this.druidServer, "singlerow");
+
+        // there is no create API for datasource, we just have to ingest and remove the data.
+        copyAndIngestTpchData(runner.execute(SELECT_SINGLE_ROW), this.druidServer, "nodata");
+        this.druidServer.dropAllSegements("nodata");
+
+        copyAndIngestTpchData(runner.execute(SELECT_FROM_ORDERS), this.druidServer, ORDERS.getTableName());
+        copyAndIngestTpchData(runner.execute(SELECT_FROM_LINEITEM), this.druidServer, LINE_ITEM.getTableName());
+        copyAndIngestTpchData(runner.execute(SELECT_FROM_NATION), this.druidServer, NATION.getTableName());
+        copyAndIngestTpchData(runner.execute(SELECT_FROM_REGION), this.druidServer, REGION.getTableName());
+        copyAndIngestTpchData(runner.execute(SELECT_FROM_PART), this.druidServer, PART.getTableName());
+        copyAndIngestTpchData(runner.execute(SELECT_FROM_CUSTOMER), this.druidServer, CUSTOMER.getTableName());
+        return runner;
+    }
 
     @AfterClass(alwaysRun = true)
     public void destroy()
@@ -318,6 +353,18 @@ public abstract class BaseDruidConnectorTest
         assertThat(query("SELECT variance(totalprice) FROM orders")).isFullyPushedDown();
         assertThat(query("SELECT var_samp(totalprice) FROM orders")).isFullyPushedDown();
         assertThat(query("SELECT var_pop(totalprice) FROM orders")).isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev(double_col) FROM singlerow");
+//        assertAggregationPushedDown("SELECT stddev_samp(double_col) FROM singlerow");
+//        assertAggregationPushedDown("SELECT stddev_pop(double_col) FROM singlerow");
+//        assertAggregationPushedDown("SELECT variance(double_col) FROM singlerow");
+//        assertAggregationPushedDown("SELECT var_samp(double_col) FROM singlerow");
+//        assertAggregationPushedDown("SELECT var_pop(double_col) FROM singlerow");
+//        assertAggregationPushedDown("SELECT stddev(double_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT stddev_samp(double_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT stddev_pop(double_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT variance(double_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT var_samp(double_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT var_pop(double_col) FROM nodata");
 
         // for bigint
         assertThat(query("SELECT count(shippriority) FROM orders")).isFullyPushedDown();
@@ -331,6 +378,18 @@ public abstract class BaseDruidConnectorTest
         assertThat(query("SELECT variance(shippriority) FROM orders")).isFullyPushedDown();
         assertThat(query("SELECT var_samp(shippriority) FROM orders")).isFullyPushedDown();
         assertThat(query("SELECT var_pop(shippriority) FROM orders")).isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev(shippriority) FROM orders");
+//        assertAggregationPushedDown("SELECT stddev_samp(shippriority) FROM orders");
+//        assertAggregationPushedDown("SELECT stddev_pop(shippriority) FROM orders");
+//        assertAggregationPushedDown("SELECT variance(shippriority) FROM orders");
+//        assertAggregationPushedDown("SELECT var_samp(shippriority) FROM orders");
+//        assertAggregationPushedDown("SELECT var_pop(shippriority) FROM orders");
+//        assertAggregationPushedDown("SELECT stddev(bigint_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT stddev_samp(bigint_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT stddev_pop(bigint_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT variance(bigint_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT var_samp(bigint_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT var_pop(bigint_col) FROM nodata");
 
         // instead of checking for an approximate value just checking for the plan
         assertThat(query("SELECT approx_distinct(custkey) FROM orders")).isFullyPushedDown();
