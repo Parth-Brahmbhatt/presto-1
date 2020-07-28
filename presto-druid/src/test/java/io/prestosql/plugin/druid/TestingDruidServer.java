@@ -229,6 +229,14 @@ public class TestingDruidServer
         }
     }
 
+    void dropAllSegements(String datasource)
+    {
+        Request.Builder requestBuilder = new Request.Builder();
+        requestBuilder.addHeader("content-type", "application/json;charset=utf-8")
+                .url("http://localhost:" + getCoordinatorOverlordPort() + "/druid/coordinator/v1/datasources/" + datasource)
+                .delete();
+    }
+
     private boolean checkDatasourceAvailable(String datasource)
             throws IOException, InterruptedException
     {
