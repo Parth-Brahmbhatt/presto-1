@@ -13,6 +13,7 @@
  */
 package io.prestosql.testing;
 
+import com.google.common.collect.Range;
 import io.prestosql.Session;
 import io.prestosql.cost.PlanNodeStatsEstimate;
 import io.prestosql.execution.warnings.WarningCollector;
@@ -21,6 +22,10 @@ import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.plan.TableScanNode;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.IntStream;
 
 import static io.prestosql.SystemSessionProperties.IGNORE_STATS_CALCULATOR_FAILURES;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -34,6 +39,7 @@ import static java.lang.String.join;
 import static java.util.Collections.nCopies;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 /**
  * Generic test for connectors exercising connector's read capabilities.
@@ -442,7 +448,7 @@ public abstract class AbstractTestIntegrationSmokeTest
                         "('views')");
     }
 
-    protected void assertAggregationPushedDown(@Language("SQL") String sql)
+    protected void assertAggregationPushedDown(@Language("SQL") String sql, List<Optional<Number>> tolerances)
     {
         String catalog = getSession().getCatalog().orElseThrow();
         Session withoutPushdown = Session.builder(getSession())
@@ -451,7 +457,12 @@ public abstract class AbstractTestIntegrationSmokeTest
 
         MaterializedResult actualResults = computeActual(sql);
         MaterializedResult expectedResults = computeActual(withoutPushdown, sql);
-        assertEqualsIgnoreOrder(actualResults.getMaterializedRows(), expectedResults.getMaterializedRows());
+        if (tolerances == null || tolerances.isEmpty()) {
+            assertEqualsIgnoreOrder(actualResults.getMaterializedRows(), expectedResults.getMaterializedRows());
+        }
+        else {
+            assertEqualsWithTolerance(actualResults, expectedResults, tolerances);
+        }
 
         transaction(getQueryRunner().getTransactionManager(), getQueryRunner().getAccessControl())
                 .execute(getSession(), session -> {
@@ -465,5 +476,59 @@ public abstract class AbstractTestIntegrationSmokeTest
                                     PlanMatchPattern.exchange(
                                             PlanMatchPattern.node(TableScanNode.class))));
                 });
+    }
+
+    private void assertEqualsWithTolerance(MaterializedResult actualResults, MaterializedResult expectedResults, List<Optional<Number>> tolerances)
+    {
+        assertEquals(expectedResults.getRowCount(), actualResults.getRowCount());
+        assertEquals(expectedResults.getTypes(), actualResults.getTypes());
+
+        IntStream.range(0, actualResults.getRowCount())
+                .forEach(row -> {
+                    MaterializedRow actualRow = actualResults.getMaterializedRows().get(row);
+                    MaterializedRow expectedRow = expectedResults.getMaterializedRows().get(row);
+                    assertEquals(actualRow.getFieldCount(), expectedRow.getFieldCount());
+
+                    IntStream.range(0, actualRow.getFieldCount())
+                            .forEach(fieldIndex -> {
+                                Object actualRowField = actualRow.getField(fieldIndex);
+                                Object expectedRowField = expectedRow.getField(fieldIndex);
+
+                                if (tolerances.get(fieldIndex).isPresent()) {
+                                    Number tolerance = tolerances.get(fieldIndex).get();
+                                    assertTrue(expectedRowField instanceof Number && expectedRowField instanceof Comparable,
+                                            "tolerance is specified for the column but column is not a number and comparable " + expectedRowField);
+
+                                    Range range = null;
+                                    if (tolerance instanceof Integer) {
+                                        range = Range.open(((Number) expectedRowField).intValue() - (Integer) tolerance, ((Number) expectedRowField).intValue() + (Integer) tolerance);
+                                    }
+                                    else if (tolerance instanceof Long) {
+                                        range = Range.open(((Number) expectedRowField).longValue() - (Long) tolerance, ((Number) expectedRowField).longValue() + (Long) tolerance);
+                                    }
+                                    else if (tolerance instanceof Float) {
+                                        range = Range.open(((Number) expectedRowField).floatValue() - (Float) tolerance, ((Number) expectedRowField).floatValue() + (Float) tolerance);
+                                    }
+                                    else if (tolerance instanceof Double) {
+                                        range = Range.open(((Number) expectedRowField).doubleValue() - (Double) tolerance, ((Number) expectedRowField).doubleValue() + (Double) tolerance);
+                                    }
+                                    else {
+                                        fail("tolerance can only be of Integer, Long, Float or Double Types but found " + tolerance.getClass());
+                                    }
+
+                                    if (!range.contains((Comparable) actualRowField)) {
+                                        fail("row " + actualRow + " has field " + actualRowField + " that is not contained in expected actual range " + range);
+                                    }
+                                }
+                                else {
+                                    assertEquals(actualRow, expectedRow);
+                                }
+                            });
+                });
+    }
+
+    protected void assertAggregationPushedDown(@Language("SQL") String sql)
+    {
+        assertAggregationPushedDown(sql, List.of());
     }
 }

@@ -34,7 +34,6 @@ import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.func
 import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.outputType;
 import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.singleInput;
 import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.variable;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class SingleInputAggregateFunction
@@ -42,20 +41,20 @@ public class SingleInputAggregateFunction
 {
     private static final Capture<Variable> INPUT = newCapture();
     private final String prestoName; // presto aggregate function name to match
-    private final Optional<String> druidName; // mapping to druid name if its not same
+    private final Optional<String> expression; // the expression format
     private final Optional<JdbcTypeHandle> jdbcTypeHandle; // type handle if its different from input column
     private Type inputType; // empty if all input types should match, or the set to match
     private Type outputType; // provide if the pattern should only match specific output type
 
     public SingleInputAggregateFunction(
             String prestoName,
-            Optional<String> druidName,
+            Optional<String> expression,
             Optional<JdbcTypeHandle> jdbcTypeHandle,
             Type inputType,
             Type outputType)
     {
         this.prestoName = requireNonNull(prestoName, "prestoName is null");
-        this.druidName = requireNonNull(druidName, "druidName is null");
+        this.expression = requireNonNull(expression, "expression is null");
         this.jdbcTypeHandle = requireNonNull(jdbcTypeHandle, "jdbcTypeHandle is null");
         this.inputType = requireNonNull(inputType, "inputType is null");
         this.outputType = requireNonNull(outputType, "outputType is null");
@@ -77,9 +76,9 @@ public class SingleInputAggregateFunction
         Variable input = captures.get(INPUT);
         JdbcColumnHandle columnHandle = (JdbcColumnHandle) context.getAssignments().get(input.getName());
         verifyNotNull(columnHandle, "Unbound variable: %s", input);
-
+        String expressionFormat = expression.orElse(prestoName + "(%s)");
         return Optional.of(new JdbcExpression(
-                format("%s(%s)", druidName.orElse(prestoName), columnHandle.toSqlExpression(context.getIdentifierQuote())),
+                expressionFormat.replaceAll("%s", columnHandle.toSqlExpression(context.getIdentifierQuote())),
                 jdbcTypeHandle.orElse(columnHandle.getJdbcTypeHandle())));
     }
 
@@ -91,7 +90,7 @@ public class SingleInputAggregateFunction
     public static final class Builder
     {
         private String prestoName;
-        private Optional<String> druidName = Optional.empty();
+        private Optional<String> expression = Optional.empty();
         private Optional<JdbcTypeHandle> jdbcTypeHandle = Optional.empty();
         private Type inputType;
         private Type outputType;
@@ -102,9 +101,9 @@ public class SingleInputAggregateFunction
             return this;
         }
 
-        public Builder druidName(String druidName)
+        public Builder expression(String expression)
         {
-            this.druidName = Optional.of(druidName);
+            this.expression = Optional.of(expression);
             return this;
         }
 
@@ -128,7 +127,7 @@ public class SingleInputAggregateFunction
 
         public SingleInputAggregateFunction build()
         {
-            return new SingleInputAggregateFunction(prestoName, druidName, jdbcTypeHandle, inputType, outputType);
+            return new SingleInputAggregateFunction(prestoName, expression, jdbcTypeHandle, inputType, outputType);
         }
     }
 }

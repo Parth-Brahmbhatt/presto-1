@@ -22,8 +22,11 @@ import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
 import io.prestosql.testing.assertions.Assert;
 import org.intellij.lang.annotations.Language;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
+
+import java.util.Optional;
 
 import static io.prestosql.plugin.druid.DruidQueryRunner.copyAndIngestTpchData;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -311,18 +314,18 @@ public class TestDruidIntegrationSmokeTest
         assertAggregationPushedDown("SELECT variance(totalprice) FROM orders");
         assertAggregationPushedDown("SELECT var_samp(totalprice) FROM orders");
         assertAggregationPushedDown("SELECT var_pop(totalprice) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev(double_col) FROM singlerow");
-//        assertAggregationPushedDown("SELECT stddev_samp(double_col) FROM singlerow");
-//        assertAggregationPushedDown("SELECT stddev_pop(double_col) FROM singlerow");
-//        assertAggregationPushedDown("SELECT variance(double_col) FROM singlerow");
-//        assertAggregationPushedDown("SELECT var_samp(double_col) FROM singlerow");
-//        assertAggregationPushedDown("SELECT var_pop(double_col) FROM singlerow");
-//        assertAggregationPushedDown("SELECT stddev(double_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT stddev_samp(double_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT stddev_pop(double_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT variance(double_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT var_samp(double_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT var_pop(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev_samp(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev_pop(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT variance(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT var_samp(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT var_pop(double_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev(double_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT stddev_samp(double_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT stddev_pop(double_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT variance(double_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT var_samp(double_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT var_pop(double_col) FROM singlerow");
 
         // for bigint
         assertAggregationPushedDown("SELECT count(shippriority) FROM orders");
@@ -330,22 +333,28 @@ public class TestDruidIntegrationSmokeTest
         assertAggregationPushedDown("SELECT max(shippriority) FROM orders");
         assertAggregationPushedDown("SELECT sum(shippriority) FROM orders");
         assertAggregationPushedDown("SELECT avg(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev_samp(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev_pop(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT variance(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT var_samp(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT var_pop(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT stddev_samp(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT stddev_pop(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT variance(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT var_samp(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT var_pop(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev(shippriority) FROM orders");
+        assertAggregationPushedDown("SELECT stddev_samp(shippriority) FROM orders");
+        assertAggregationPushedDown("SELECT stddev_pop(shippriority) FROM orders");
+        assertAggregationPushedDown("SELECT variance(shippriority) FROM orders");
+        assertAggregationPushedDown("SELECT var_samp(shippriority) FROM orders");
+        assertAggregationPushedDown("SELECT var_pop(shippriority) FROM orders");
+        assertAggregationPushedDown("SELECT stddev(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev_samp(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev_pop(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT variance(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT var_samp(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT var_pop(bigint_col) FROM nodata");
+        assertAggregationPushedDown("SELECT stddev(bigint_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT stddev_samp(bigint_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT stddev_pop(bigint_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT variance(bigint_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT var_samp(bigint_col) FROM singlerow");
+        assertAggregationPushedDown("SELECT var_pop(bigint_col) FROM singlerow");
 
-//        assertAggregationPushedDown("SELECT approx_distinct(custkey) FROM orders");
-//        assertAggregationPushedDown("SELECT approx_distinct(totalprice) FROM orders");
-//        assertAggregationPushedDown("SELECT approx_distinct(comment) FROM orders");
-//        assertAggregationPushedDown("SELECT approx_distinct(__time) FROM orders");
+        assertAggregationPushedDown("SELECT approx_distinct(custkey) FROM orders", ImmutableList.of(Optional.of(100L)));
+        assertAggregationPushedDown("SELECT approx_distinct(totalprice) FROM orders", ImmutableList.of(Optional.of(100L)));
+        assertAggregationPushedDown("SELECT approx_distinct(comment) FROM orders", ImmutableList.of(Optional.of(100L)));
+        assertAggregationPushedDown("SELECT approx_distinct(__time) FROM orders", ImmutableList.of(Optional.of(100L)));
     }
 }

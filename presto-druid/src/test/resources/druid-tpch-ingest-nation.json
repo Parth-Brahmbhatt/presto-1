@@ -22,7 +22,7 @@
                         "dimensions": [
                             {
                                 "name": "nationkey",
-                                "type": "double"
+                                "type": "long"
                             },
                             {
                                 "name": "name",
