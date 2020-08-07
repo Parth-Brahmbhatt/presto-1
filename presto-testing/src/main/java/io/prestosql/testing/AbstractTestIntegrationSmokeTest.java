@@ -521,7 +521,7 @@ public abstract class AbstractTestIntegrationSmokeTest
                                     }
                                 }
                                 else {
-                                    assertEquals(actualRow, expectedRow);
+                                    assertEquals(actualRowField, expectedRowField);
                                 }
                             });
                 });
