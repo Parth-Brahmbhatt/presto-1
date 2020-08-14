@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
+import org.apache.iceberg.catalog.TableIdentifier;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -131,5 +132,10 @@ public class IcebergTableHandle
     public String toString()
     {
         return getSchemaTableNameWithType() + "@" + snapshotId;
+    }
+
+    public TableIdentifier toTableIdentifier()
+    {
+        return TableIdentifier.of(schemaName, tableName, tableType.name());
     }
 }
