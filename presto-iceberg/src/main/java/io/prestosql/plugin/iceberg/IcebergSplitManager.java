@@ -63,7 +63,7 @@ public class IcebergSplitManager
         }
 
         HiveMetastore metastore = transactionManager.get(transaction).getMetastore();
-        Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
+        Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, table);
 
         TableScan tableScan = icebergTable.newScan()
                 .filter(toIcebergExpression(
