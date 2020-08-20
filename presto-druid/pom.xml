@@ -23,6 +23,11 @@
         </dependency>
 
         <dependency>
+            <groupId>io.prestosql</groupId>
+            <artifactId>presto-matching</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
@@ -86,18 +91,7 @@
             <scope>provided</scope>
         </dependency>
 
-        <dependency>
-            <groupId>io.prestosql</groupId>
-            <artifactId>presto-matching</artifactId>
-        </dependency>
-
         <!-- for testing -->
-        <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>io.prestosql</groupId>
             <artifactId>presto-main</artifactId>
