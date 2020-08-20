@@ -37,6 +37,7 @@ import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.variable
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
+//TODO Move this class to base-jdbc module and update all jdbc connectors to leverage it.
 public class SingleInputAggregateFunction
         implements AggregateFunctionRule
 {
