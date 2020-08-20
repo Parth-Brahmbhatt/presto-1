@@ -36,6 +36,7 @@ import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.sing
 import static io.prestosql.plugin.jdbc.expression.AggregateFunctionPatterns.variable;
 import static java.util.Objects.requireNonNull;
 
+//TODO Move this class to base-jdbc module and update all jdbc connectors to leverage it.
 public class SingleInputAggregateFunction
         implements AggregateFunctionRule
 {
