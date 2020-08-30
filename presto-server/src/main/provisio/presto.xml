@@ -50,18 +50,6 @@
         </artifact>
     </artifactSet>
 
-    <artifactSet to="plugin/cassandra">
-        <artifact id="${project.groupId}:presto-cassandra:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/example-http">
-        <artifact id="${project.groupId}:presto-example-http:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
     <artifactSet to="plugin/hive-hadoop2">
         <artifact id="${project.groupId}:presto-hive-hadoop2:zip:${project.version}">
             <unpack />
@@ -86,95 +74,12 @@
         </artifact>
     </artifactSet>
 
-    <artifactSet to="plugin/kafka">
-        <artifact id="${project.groupId}:presto-kafka:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/kudu">
-        <artifact id="${project.groupId}:presto-kudu:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/atop">
-        <artifact id="${project.groupId}:presto-atop:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/ml">
-        <artifact id="${project.groupId}:presto-ml:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
     <artifactSet to="plugin/geospatial">
         <artifact id="${project.groupId}:presto-geospatial:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
 
-    <artifactSet to="plugin/memsql">
-        <artifact id="${project.groupId}:presto-memsql:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/mysql">
-        <artifact id="${project.groupId}:presto-mysql:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/oracle">
-        <artifact id="${project.groupId}:presto-oracle:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/phoenix">
-        <artifact id="${project.groupId}:presto-phoenix:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/postgresql">
-        <artifact id="${project.groupId}:presto-postgresql:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/prometheus">
-        <artifact id="${project.groupId}:presto-prometheus:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/redshift">
-        <artifact id="${project.groupId}:presto-redshift:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/sqlserver">
-        <artifact id="${project.groupId}:presto-sqlserver:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/raptor-legacy">
-        <artifact id="${project.groupId}:presto-raptor-legacy:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/redis">
-        <artifact id="${project.groupId}:presto-redis:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
 
     <artifactSet to="plugin/tpch">
         <artifact id="${project.groupId}:presto-tpch:zip:${project.version}">
@@ -184,65 +89,6 @@
 
     <artifactSet to="plugin/tpcds">
         <artifact id="${project.groupId}:presto-tpcds:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/teradata-functions">
-        <artifact id="${project.groupId}:presto-teradata-functions:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/mongodb">
-        <artifact id="${project.groupId}:presto-mongodb:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/local-file">
-        <artifact id="${project.groupId}:presto-local-file:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/accumulo">
-        <artifact id="${project.groupId}:presto-accumulo:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/thrift">
-        <artifact id="${project.groupId}:presto-thrift:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/elasticsearch">
-        <artifact id="${project.groupId}:presto-elasticsearch:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/google-sheets">
-        <artifact id="${project.groupId}:presto-google-sheets:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/kinesis">
-        <artifact id="${project.groupId}:presto-kinesis:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/bigquery">
-        <artifact id="${project.groupId}:presto-bigquery:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-    <artifactSet to="plugin/presto-pinot">
-        <artifact id="${project.groupId}:presto-pinot:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>

@@ -14,24 +14,29 @@
 package io.prestosql.plugin.jdbc;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.Range;
 import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.Type;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -117,35 +122,30 @@ public class QueryBuilder
 
         String query = sqlFunction.apply(sql);
         log.debug("Preparing query: %s", query);
-        PreparedStatement statement = client.getPreparedStatement(connection, query);
 
         for (int i = 0; i < accumulator.size(); i++) {
             TypeAndValue typeAndValue = accumulator.get(i);
-            int parameterIndex = i + 1;
             Type type = typeAndValue.getType();
-            WriteFunction writeFunction = client.toPrestoType(session, connection, typeAndValue.getTypeHandle())
-                    .orElseThrow(() -> new VerifyException(format("Unsupported type %s with handle %s", type, typeAndValue.getTypeHandle())))
-                    .getWriteFunction();
             Class<?> javaType = type.getJavaType();
             Object value = typeAndValue.getValue();
-            if (javaType == boolean.class) {
-                ((BooleanWriteFunction) writeFunction).set(statement, parameterIndex, (boolean) value);
+            if (type instanceof TimestampType) {
+                SimpleDateFormat jdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                jdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                final String timestamp = jdf.format(new Date((Long) value));
+                query = query.replaceFirst("\\?", String.format("timestamp '%s'", timestamp));
             }
-            else if (javaType == long.class) {
-                ((LongWriteFunction) writeFunction).set(statement, parameterIndex, (long) value);
-            }
-            else if (javaType == double.class) {
-                ((DoubleWriteFunction) writeFunction).set(statement, parameterIndex, (double) value);
+            else if (javaType == boolean.class || javaType == long.class || javaType == double.class) {
+                query = query.replaceFirst("\\?", String.valueOf(value));
             }
             else if (javaType == Slice.class) {
-                ((SliceWriteFunction) writeFunction).set(statement, parameterIndex, (Slice) value);
+                query = query.replaceFirst("\\?", String.format("'%s'", ((Slice) value).toStringUtf8()));
             }
             else {
-                ((ObjectWriteFunction) writeFunction).set(statement, parameterIndex, value);
+                throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Only boolean, long, double, varchars and timestamp are supported for druid");
             }
         }
 
-        return statement;
+        return client.getPreparedStatement(connection, query);
     }
 
     protected String getRelation(RemoteTableName remoteTableName)
