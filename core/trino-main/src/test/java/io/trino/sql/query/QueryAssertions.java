@@ -14,6 +14,7 @@
 package io.trino.sql.query;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Range;
 import io.trino.Session;
 import io.trino.cost.PlanNodeStatsEstimate;
 import io.trino.execution.warnings.WarningCollector;
@@ -41,8 +42,10 @@ import org.intellij.lang.annotations.Language;
 import java.io.Closeable;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -55,6 +58,7 @@ import static io.trino.transaction.TransactionBuilder.transaction;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 public class QueryAssertions
@@ -292,6 +296,11 @@ public class QueryAssertions
 
         public QueryAssert matches(MaterializedResult expected)
         {
+            return matches(expected, List.of());
+        }
+
+        private QueryAssert matches(MaterializedResult expected, List<Optional<Number>> tolerances)
+        {
             return satisfies(actual -> {
                 if (!skipTypesCheck) {
                     assertTypes(actual, expected.getTypes());
@@ -302,9 +311,22 @@ public class QueryAssertions
                         .withRepresentation(ROWS_REPRESENTATION);
 
                 if (ordered) {
-                    assertion.containsExactlyElementsOf(expected.getMaterializedRows());
+                    if (tolerances != null && !tolerances.isEmpty()) {
+                        IntStream.range(0, actual.getRowCount())
+                                .forEach(row -> {
+                                    MaterializedRow actualRow = actual.getMaterializedRows().get(row);
+                                    MaterializedRow expectedRow = expected.getMaterializedRows().get(row);
+                                    matchWithTolerance(actualRow, expectedRow, tolerances);
+                                });
+                    }
+                    else {
+                        assertion.containsExactlyElementsOf(expected.getMaterializedRows());
+                    }
                 }
                 else {
+                    if (tolerances != null && !tolerances.isEmpty()) {
+                        throw new UnsupportedOperationException("can not support in exact matches with unordered results.");
+                    }
                     assertion.containsExactlyInAnyOrderElementsOf(expected.getMaterializedRows());
                 }
             });
@@ -353,6 +375,47 @@ public class QueryAssertions
                     .isEqualTo(expectedTypes);
         }
 
+        private void matchWithTolerance(MaterializedRow actualRow, MaterializedRow expectedRow, List<Optional<Number>> tolerances)
+        {
+            assertEquals(actualRow.getFieldCount(), expectedRow.getFieldCount());
+
+            IntStream.range(0, actualRow.getFieldCount())
+                    .forEach(fieldIndex -> {
+                        Object actualRowField = actualRow.getField(fieldIndex);
+                        Object expectedRowField = expectedRow.getField(fieldIndex);
+
+                        if (tolerances.get(fieldIndex).isPresent()) {
+                            Number tolerance = tolerances.get(fieldIndex).get();
+                            assertTrue(expectedRowField instanceof Number && expectedRowField instanceof Comparable,
+                                    "tolerance is specified for the column but column is not a number and comparable " + expectedRowField);
+
+                            Range range = null;
+                            if (tolerance instanceof Integer) {
+                                range = Range.open(((Number) expectedRowField).intValue() - (Integer) tolerance, ((Number) expectedRowField).intValue() + (Integer) tolerance);
+                            }
+                            else if (tolerance instanceof Long) {
+                                range = Range.open(((Number) expectedRowField).longValue() - (Long) tolerance, ((Number) expectedRowField).longValue() + (Long) tolerance);
+                            }
+                            else if (tolerance instanceof Float) {
+                                range = Range.open(((Number) expectedRowField).floatValue() - (Float) tolerance, ((Number) expectedRowField).floatValue() + (Float) tolerance);
+                            }
+                            else if (tolerance instanceof Double) {
+                                range = Range.open(((Number) expectedRowField).doubleValue() - (Double) tolerance, ((Number) expectedRowField).doubleValue() + (Double) tolerance);
+                            }
+                            else {
+                                fail("tolerance can only be of Integer, Long, Float or Double Types but found " + tolerance.getClass());
+                            }
+
+                            if (!range.contains((Comparable) actualRowField)) {
+                                fail("row " + actualRow + " has field " + actualRowField + " that is not contained in expected actual range " + range);
+                            }
+                        }
+                        else {
+                            assertEquals(actualRow, expectedRow);
+                        }
+                    });
+        }
+
         public QueryAssert returnsEmptyResult()
         {
             return satisfies(actual -> {
@@ -365,10 +428,18 @@ public class QueryAssertions
          */
         public QueryAssert isFullyPushedDown()
         {
+            return isCorrectlyPushedDown(List.of());
+        }
+
+        /**
+         * Verifies query is fully pushed down and verifies the results are the same as when the pushdown is disabled.
+         */
+        public QueryAssert isCorrectlyPushedDown(List<Optional<Number>> tolerances)
+        {
             checkState(!(runner instanceof LocalQueryRunner), "testIsFullyPushedDown() currently does not work with LocalQueryRunner");
 
             // Compare the results with pushdown disabled, so that explicit matches() call is not needed
-            verifyResultsWithPushdownDisabled();
+            verifyResultsWithPushdownDisabled(tolerances);
 
             transaction(runner.getTransactionManager(), runner.getAccessControl())
                     .execute(session, session -> {
@@ -431,6 +502,11 @@ public class QueryAssertions
         }
 
         private void verifyResultsWithPushdownDisabled()
+        {
+            verifyResultsWithPushdownDisabled(List.of());
+        }
+
+        private void verifyResultsWithPushdownDisabled(List<Optional<Number>> tolerances)
         {
             Session withoutPushdown = Session.builder(session)
                     .setSystemProperty("allow_pushdown_into_connectors", "false")

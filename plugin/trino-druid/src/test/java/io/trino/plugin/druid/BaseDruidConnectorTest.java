@@ -379,18 +379,27 @@ public abstract class BaseDruidConnectorTest
         assertThat(query("SELECT variance(shippriority) FROM orders")).isFullyPushedDown();
         assertThat(query("SELECT var_samp(shippriority) FROM orders")).isFullyPushedDown();
         assertThat(query("SELECT var_pop(shippriority) FROM orders")).isFullyPushedDown();
-//        assertAggregationPushedDown("SELECT stddev(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev_samp(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev_pop(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT variance(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT var_samp(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT var_pop(shippriority) FROM orders");
-//        assertAggregationPushedDown("SELECT stddev(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT stddev_samp(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT stddev_pop(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT variance(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT var_samp(bigint_col) FROM nodata");
-//        assertAggregationPushedDown("SELECT var_pop(bigint_col) FROM nodata");
+//        assertAggregationPushedDown("SELECT stddev(shippriority) FROM orders").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev_samp(shippriority) FROM orders").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev_pop(shippriority) FROM orders").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT variance(shippriority) FROM orders").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT var_samp(shippriority) FROM orders").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT var_pop(shippriority) FROM orders").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev(bigint_col) FROM nodata").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev_samp(bigint_col) FROM nodata").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT stddev_pop(bigint_col) FROM nodata").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT variance(bigint_col) FROM nodata").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT var_samp(bigint_col) FROM nodata").isFullyPushedDown();
+//        assertAggregationPushedDown("SELECT var_pop(bigint_col) FROM nodata").isFullyPushedDown();
+//        assertThat(query("SELECT stddev(bigint_col) FROM singlerow")).isFullyPushedDown();
+//        assertThat(query("SELECT stddev_samp(bigint_col) FROM singlerow")).isFullyPushedDown();
+//        assertThat(query("SELECT stddev_pop(bigint_col) FROM singlerow")).isFullyPushedDown();
+//        assertThat(query("SELECT variance(bigint_col) FROM singlerow")).isFullyPushedDown();
+//        assertThat(query("SELECT var_samp(bigint_col) FROM singlerow")).isFullyPushedDown();
+//        assertThat(query("SELECT var_pop(bigint_col) FROM singlerow")).isFullyPushedDown();
+
+        //distinct
+        assertThat(query("SELECT distinct shippriority,clerk FROM orders")).isFullyPushedDown();
 
         // instead of checking for an approximate value just checking for the plan
         assertThat(query("SELECT approx_distinct(custkey) FROM orders")).isFullyPushedDown();
