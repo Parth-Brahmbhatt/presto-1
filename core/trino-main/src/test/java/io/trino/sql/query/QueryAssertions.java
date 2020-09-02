@@ -511,7 +511,7 @@ public class QueryAssertions
             Session withoutPushdown = Session.builder(session)
                     .setSystemProperty("allow_pushdown_into_connectors", "false")
                     .build();
-            matches(runner.execute(withoutPushdown, query));
+            matches(runner.execute(withoutPushdown, query), tolerances);
         }
     }
 
