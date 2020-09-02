@@ -28,6 +28,8 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
+import java.util.Optional;
+
 import static io.trino.plugin.druid.DruidQueryRunner.copyAndIngestTpchData;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.testing.MaterializedResult.resultBuilder;
@@ -402,12 +404,11 @@ public abstract class BaseDruidConnectorTest
         assertThat(query("SELECT distinct shippriority,clerk FROM orders")).isFullyPushedDown();
 
         // instead of checking for an approximate value just checking for the plan
-        assertThat(query("SELECT approx_distinct(custkey) FROM orders")).isFullyPushedDown();
-        assertThat(query("SELECT approx_distinct(totalprice) FROM orders")).isFullyPushedDown();
-        assertThat(query("SELECT approx_distinct(comment) FROM orders")).isFullyPushedDown();
-        assertThat(query("SELECT approx_distinct(__time) FROM orders")).isFullyPushedDown();
+        assertThat(query("SELECT approx_distinct(custkey) FROM orders")).isCorrectlyPushedDown(ImmutableList.of(Optional.of(100L)));
+        assertThat(query("SELECT approx_distinct(totalprice) FROM orders")).isCorrectlyPushedDown(ImmutableList.of(Optional.of(100L)));
+        assertThat(query("SELECT approx_distinct(comment) FROM orders")).isCorrectlyPushedDown(ImmutableList.of(Optional.of(100L)));
+        assertThat(query("SELECT approx_distinct(__time) FROM orders")).isCorrectlyPushedDown(ImmutableList.of(Optional.of(100L)));
     }
-
     @Test
     @Override
     public void testLimitPushDown()
