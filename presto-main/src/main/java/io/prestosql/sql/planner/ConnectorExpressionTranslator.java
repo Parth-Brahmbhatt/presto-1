@@ -20,6 +20,7 @@ import io.prestosql.spi.expression.FieldDereference;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.RowType;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BinaryLiteral;
@@ -29,6 +30,8 @@ import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DoubleLiteral;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.FunctionCall;
+import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.Identifier;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.NodeRef;
@@ -36,12 +39,21 @@ import io.prestosql.sql.tree.NullLiteral;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.slice.Slices.utf8Slice;
+import static io.prestosql.metadata.ResolvedFunction.extractFunctionName;
+import static io.prestosql.spi.type.StandardTypes.BIGINT;
+import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
+import static io.prestosql.spi.type.StandardTypes.INTEGER;
+import static io.prestosql.spi.type.StandardTypes.SMALLINT;
+import static io.prestosql.spi.type.StandardTypes.TINYINT;
 import static java.util.Objects.requireNonNull;
 
 public final class ConnectorExpressionTranslator
@@ -133,6 +145,40 @@ public final class ConnectorExpressionTranslator
         }
 
         @Override
+        protected Optional<ConnectorExpression> visitGenericLiteral(GenericLiteral node, Void context)
+        {
+            final Type type = typeOf(node);
+            switch (type.getTypeId().getId()) {
+                case BIGINT:
+                    return Optional.of(new Constant(new BigInteger(node.getValue()), type));
+                case INTEGER:
+                case SMALLINT:
+                case TINYINT:
+                    return Optional.of(new Constant(Integer.parseInt(node.getValue()), type));
+                case BOOLEAN:
+                    return Optional.of(new Constant(Boolean.parseBoolean(node.getValue()), type));
+                case StandardTypes.DOUBLE:
+                    return Optional.of(new Constant(Double.parseDouble(node.getValue()), type));
+                case StandardTypes.CHAR:
+                case StandardTypes.VARCHAR:
+                    return Optional.of(new Constant(utf8Slice(node.getValue()), type));
+                //TODO add more type support here
+//                case StandardTypes.REAL:
+//                    return Optional.of(new Constant(Float.parseFloat(node.getValue()), type));
+//                case DATE:
+//                case StandardTypes.VARBINARY:
+//                case StandardTypes.TIME_WITH_TIME_ZONE:
+//                case StandardTypes.TIME:
+//                case StandardTypes.TIMESTAMP_WITH_TIME_ZONE:
+//                case StandardTypes.TIMESTAMP:
+                case StandardTypes.DECIMAL:
+                    return Optional.of(new Constant(Decimals.parse(node.getValue()), type));
+                default:
+                    return Optional.empty();
+            }
+        }
+
+        @Override
         protected Optional<ConnectorExpression> visitCharLiteral(CharLiteral node, Void context)
         {
             return Optional.of(new Constant(node.getSlice(), typeOf(node)));
@@ -184,6 +230,23 @@ public final class ConnectorExpressionTranslator
         @Override
         protected Optional<ConnectorExpression> visitExpression(Expression node, Void context)
         {
+            if(node instanceof FunctionCall) {
+                FunctionCall functionCall = (FunctionCall) node;
+                if(functionCall.isDistinct() || functionCall.getWindow().isPresent() || functionCall.getFilter().isPresent() || functionCall.getOrderBy().isPresent() || functionCall.getNullTreatment().isPresent()) {
+                    return Optional.empty();
+                }
+                final List<ConnectorExpression> arguments = functionCall.getArguments().stream()
+                        .map(expression -> process(expression, context))
+                        .filter(arg -> arg.isPresent())
+                        .map(arg -> arg.get())
+                        .collect(Collectors.toList());
+
+                if(arguments.size() != functionCall.getArguments().size()) {
+                    return Optional.empty();
+                }
+
+                return Optional.of(new io.prestosql.spi.expression.FunctionCall(extractFunctionName(functionCall.getName()), arguments, typeOf(node)));
+            }
             return Optional.empty();
         }
 

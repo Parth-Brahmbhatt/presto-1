@@ -16,6 +16,7 @@ package io.prestosql.plugin.druid;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.plugin.druid.aggregate.SingleInputAggregateFunction;
+import io.prestosql.plugin.druid.function.FunctionRuleDSL;
 import io.prestosql.plugin.jdbc.BaseJdbcClient;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ColumnMapping;
@@ -31,6 +32,8 @@ import io.prestosql.plugin.jdbc.QueryBuilder;
 import io.prestosql.plugin.jdbc.RemoteTableName;
 import io.prestosql.plugin.jdbc.expression.AggregateFunctionRewriter;
 import io.prestosql.plugin.jdbc.expression.AggregateFunctionRule;
+import io.prestosql.plugin.jdbc.expression.FunctionRewriter;
+import io.prestosql.plugin.jdbc.expression.FunctionRule;
 import io.prestosql.plugin.jdbc.expression.ImplementCount;
 import io.prestosql.plugin.jdbc.expression.ImplementCountAll;
 import io.prestosql.spi.PrestoException;
@@ -39,6 +42,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.expression.FunctionCall;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
@@ -82,6 +86,7 @@ public class DruidJdbcClient
     // All the datasources in Druid are created under schema "druid"
     public static final String DRUID_SCHEMA = "druid";
     private AggregateFunctionRewriter aggregateFunctionRewriter;
+    private FunctionRewriter functionRewriter;
 
     @Inject
     public DruidJdbcClient(BaseJdbcConfig config, ConnectionFactory connectionFactory)
@@ -91,6 +96,10 @@ public class DruidJdbcClient
         this.aggregateFunctionRewriter = new AggregateFunctionRewriter(
                 this::quoted,
                 aggregateFunctionRules());
+
+        this.functionRewriter = new FunctionRewriter(
+                this::quoted,
+                functionRules());
     }
 
     @Override
@@ -173,6 +182,14 @@ public class DruidJdbcClient
     public Optional<JdbcExpression> implementAggregation(ConnectorSession session, AggregateFunction aggregate, Map<String, ColumnHandle> assignments)
     {
         return aggregateFunctionRewriter.rewrite(session, aggregate, assignments);
+    }
+
+    @Override
+    public Optional<JdbcExpression> implementFunction(ConnectorSession session, FunctionCall function, Map<String, ColumnHandle> assignments)
+    {
+        final Map<String, JdbcColumnHandle> columnHandleMap = assignments.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, column -> (JdbcColumnHandle) column.getValue()));
+        return functionRewriter.rewrite(session, function, columnHandleMap);
     }
 
     // Druid doesn't like table names to be qualified with catalog names in the SQL query.
@@ -384,4 +401,265 @@ public class DruidJdbcClient
                                 .build()));
         return builder.build();
     }
+
+    private Set<FunctionRule> functionRules()
+    {
+
+        JdbcTypeHandle bigIntHandle = new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), 0, 0, Optional.empty(), Optional.empty());
+        JdbcTypeHandle doubleHandle = new JdbcTypeHandle(Types.DOUBLE, Optional.of("double"), 0, 0, Optional.empty(), Optional.empty());
+        JdbcTypeHandle timestampHandle = new JdbcTypeHandle(Types.TIMESTAMP, Optional.of("timestamp"), 0, 0, Optional.empty(), Optional.empty());
+        JdbcTypeHandle varcharHandle = new JdbcTypeHandle(Types.VARCHAR, Optional.of("varchar"), -1, 0, Optional.empty(), Optional.empty());
+        ImmutableSet.Builder<FunctionRule> builder = ImmutableSet.builder();
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("date_trunc")
+                .expression("DATE_TRUNC(%s)")
+                .jdbcTypeHandle(timestampHandle)
+                .outputType(TimestampType.createTimestampType(3))
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("year")
+                .expression("EXTRACT(YEAR from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("quarter")
+                .expression("EXTRACT(QUARTER from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("month")
+                .expression("EXTRACT(MONTH from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("week")
+                .expression("EXTRACT(WEEK from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("day")
+                .expression("EXTRACT(DAY from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("day_of_week")
+                .expression("EXTRACT(DOW from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("day_of_year")
+                .expression("EXTRACT(DOY from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("hour")
+                .expression("EXTRACT(HOUR from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("minute")
+                .expression("EXTRACT(MINUTE from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("second")
+                .expression("EXTRACT(SECOND from %s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+// literal issue
+//        builder.add(FunctionRuleDSL.builder()
+//                .prestoName("parse_datetime")
+//                .expression("TIME_PARSE(%s)")
+//                .jdbcTypeHandle(timestampWithTimezoneHandle)
+//                .outputType(TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3))
+//                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("format_datetime")
+                .expression("TIME_FORMAT(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+// literal issue
+//        builder.add(FunctionRuleDSL.builder()
+//                .prestoName("from_unixtime")
+//                .expression("MILLIS_TO_TIMESTAMP(%s)")
+//                .jdbcTypeHandle(timestampHandle)
+//                .outputType(TimestampType.createTimestampType(3))
+//                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("to_unixtime")
+                .expression("TIMESTAMP_TO_MILLIS(%s)")
+                .jdbcTypeHandle(doubleHandle)
+                .outputType(DOUBLE)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("date_add")
+                .expression("TIMESTAMPADD(%s)")
+                .jdbcTypeHandle(timestampHandle)
+                .shouldQuoteStringLiterals(false)
+                .outputType(TimestampType.createTimestampType(3))
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("date_diff")
+                .expression("TIMESTAMPDIFF(%s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .shouldQuoteStringLiterals(false)
+                .outputType(BIGINT)
+                .build());
+
+        // STRING FUNCTIONS
+        // TODO: would only work with 2 args, others will break
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("concat")
+                .expression("CONCAT(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        //Format does not work as the second argument is of type row
+//        builder.add(FunctionRuleDSL.builder()
+//                .prestoName("format")
+//                .expression("STRING_FORMAT(%s)")
+//                .jdbcTypeHandle(varcharHandle)
+//                .outputType(VARCHAR)
+//                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("length")
+                .expression("LENGTH(%s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("lower")
+                .expression("LOWER(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("position")
+                .expression("POSITION(%s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+//        Fails because regex is casted
+//        builder.add(FunctionRuleDSL.builder()
+//                .prestoName("regexp_extract")
+//                .expression("REGEXP_EXTRACT(%s)")
+//                .jdbcTypeHandle(varcharHandle)
+//                .outputType(VARCHAR)
+//                .build());
+
+//        Fails because regex is casted
+//        builder.add(FunctionRuleDSL.builder()
+//                .prestoName("regexp_like")
+//                .expression("REGEXP_LIKE(%s)")
+//                .jdbcTypeHandle(booleanHandle)
+//                .outputType(BOOLEAN)
+//                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("replace")
+                .expression("REPLACE(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        // has 2 presto version and only one will work the other one will break
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("strpos")
+                .expression("STRPOS(%s)")
+                .jdbcTypeHandle(bigIntHandle)
+                .outputType(BIGINT)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("substring")
+                .expression("SUBSTRING(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("trim")
+                .expression("BTRIM(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("ltrim")
+                .expression("LTRIM(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("rtrim")
+                .expression("RTRIM(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("upper")
+                .expression("UPPER(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("reverse")
+                .expression("REVERSE(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("lpad")
+                .expression("LPAD(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("rpad")
+                .expression("RPAD(%s)")
+                .jdbcTypeHandle(varcharHandle)
+                .outputType(VARCHAR)
+                .build());
+
+        // MATH Functions, need single input as output types depend on input types
+        return builder.build();
+    }
+
 }

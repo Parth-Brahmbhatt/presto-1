@@ -42,6 +42,7 @@ import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.expression.ConnectorExpression;
+import io.prestosql.spi.expression.FunctionCall;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -174,8 +175,43 @@ public class JdbcMetadata
     {
         JdbcTableHandle handle = (JdbcTableHandle) table;
 
-        List<JdbcColumnHandle> newColumns = assignments.values().stream()
-                .map(JdbcColumnHandle.class::cast)
+        int syntheticNextIdentifier = 0;
+        ImmutableList.Builder<Assignment> resultAssignmentsBuilder = ImmutableList.builder();
+        ImmutableList.Builder<ConnectorExpression> resultProjections = ImmutableList.builder();
+        for (ConnectorExpression projection : projections) {
+            if (projection instanceof FunctionCall) {
+                FunctionCall functionCall = (FunctionCall) projection;
+                final Optional<JdbcExpression> jdbcExpression = jdbcClient.implementFunction(session, functionCall, assignments);
+                if (jdbcExpression.isPresent()) {
+                    JdbcColumnHandle newColumn = JdbcColumnHandle.builder()
+                            .setExpression(Optional.of(jdbcExpression.get().getExpression()))
+                            .setColumnName(SYNTHETIC_COLUMN_NAME_PREFIX + "_function_" +syntheticNextIdentifier)
+                            .setJdbcTypeHandle(jdbcExpression.get().getJdbcTypeHandle())
+                            .setColumnType(functionCall.getType())
+                            .setComment(Optional.of("synthetic"))
+                            .build();
+                    syntheticNextIdentifier++;
+
+                    resultProjections.add(new Variable(newColumn.getColumnName(), functionCall.getType()));
+                    resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, functionCall.getType()));
+                } else {
+                    resultProjections.add(projection);
+                }
+            }
+            else {
+                resultProjections.add(projection);
+            }
+        }
+
+        assignments.entrySet()
+                .forEach(assignment -> resultAssignmentsBuilder.add(new Assignment(
+                        assignment.getKey(),
+                        assignment.getValue(),
+                        ((JdbcColumnHandle) assignment.getValue()).getColumnType())));
+
+        final ImmutableList<Assignment> resultAssignments = resultAssignmentsBuilder.build();
+        List<JdbcColumnHandle> newColumns = resultAssignments.stream()
+                .map(assignment -> (JdbcColumnHandle)(assignment.getColumn()))
                 .collect(toImmutableList());
 
         if (handle.getColumns().isPresent() && containSameElements(newColumns, handle.getColumns().get())) {
@@ -190,13 +226,8 @@ public class JdbcMetadata
                         handle.getGroupingSets(),
                         handle.getLimit(),
                         Optional.of(newColumns)),
-                projections,
-                assignments.entrySet().stream()
-                        .map(assignment -> new Assignment(
-                                assignment.getKey(),
-                                assignment.getValue(),
-                                ((JdbcColumnHandle) assignment.getValue()).getColumnType()))
-                        .collect(toImmutableList())));
+                resultProjections.build(),
+                resultAssignments));
     }
 
     @Override

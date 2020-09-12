@@ -288,15 +288,13 @@ public class QueryBuilder
                 return "";
             }
             return " GROUP BY " + groupingSet.stream()
-                    .map(JdbcColumnHandle::getColumnName)
-                    .map(client::quoted)
+                    .map(column -> column.getExpression().orElse(client.quoted(column.getColumnName())))
                     .collect(joining(", "));
         }
         return " GROUP BY GROUPING SETS " +
                 groupingSets.get().stream()
                         .map(groupingSet -> groupingSet.stream()
-                                .map(JdbcColumnHandle::getColumnName)
-                                .map(client::quoted)
+                                .map(column -> column.getExpression().orElse(client.quoted(column.getColumnName())))
                                 .collect(joining(", ", "(", ")")))
                         .collect(joining(", ", "(", ")"));
     }

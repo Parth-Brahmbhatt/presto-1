@@ -346,7 +346,8 @@ public class PlanOptimizers
                 estimatedExchangesCostCalculator,
                 ImmutableSet.of(
                         new InlineProjections(),
-                        new RemoveRedundantIdentityProjections()));
+                        new RemoveRedundantIdentityProjections(),
+                        new PushAggregationIntoTableScan(metadata)));
 
         IterativeOptimizer projectionPushDown = new IterativeOptimizer(
                 ruleStats,
