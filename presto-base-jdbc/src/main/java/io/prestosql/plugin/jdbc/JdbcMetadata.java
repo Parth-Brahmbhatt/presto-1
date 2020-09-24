@@ -42,6 +42,7 @@ import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.expression.ConnectorExpression;
+import io.prestosql.spi.expression.Constant;
 import io.prestosql.spi.expression.FunctionCall;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.predicate.Domain;
@@ -194,9 +195,33 @@ public class JdbcMetadata
 
                     resultProjections.add(new Variable(newColumn.getColumnName(), functionCall.getType()));
                     resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, functionCall.getType()));
-                } else {
-                    resultProjections.add(projection);
                 }
+            }
+            else if (projection instanceof Constant) {
+                final Constant constant = (Constant) projection;
+                String value = constant.getValue().toString();
+                if (constant.getValue() instanceof Slice) {
+                    value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
+                }
+                final JdbcExpression constantExpression = new JdbcExpression(
+                        value,
+                        new JdbcTypeHandle(StandardColumnMappings.prestoTypeToJdbcType(projection.getType()).get(),
+                                Optional.empty(),
+                                0,
+                                0,
+                                Optional.empty(),
+                                Optional.empty()));
+                JdbcColumnHandle newColumn = JdbcColumnHandle.builder()
+                        .setExpression(Optional.of(constantExpression.getExpression()))
+                        .setColumnName(SYNTHETIC_COLUMN_NAME_PREFIX + "_constant_" + syntheticNextIdentifier)
+                        .setJdbcTypeHandle(constantExpression.getJdbcTypeHandle())
+                        .setColumnType(projection.getType())
+                        .setComment(Optional.of("synthetic"))
+                        .build();
+                syntheticNextIdentifier++;
+
+                resultProjections.add(new Variable(newColumn.getColumnName(), projection.getType()));
+                resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, projection.getType()));
             }
             else {
                 resultProjections.add(projection);

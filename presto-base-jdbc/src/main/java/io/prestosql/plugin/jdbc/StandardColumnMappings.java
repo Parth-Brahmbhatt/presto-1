@@ -14,11 +14,24 @@
 package io.prestosql.plugin.jdbc;
 
 import com.google.common.base.CharMatcher;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.CharType;
+import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.RealType;
+import io.prestosql.spi.type.TimeType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TimestampWithTimeZoneType;
+import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarbinaryType;
 import io.prestosql.spi.type.VarcharType;
 import org.joda.time.DateTimeZone;
 import org.joda.time.chrono.ISOChronology;
@@ -36,12 +49,14 @@ import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static io.prestosql.plugin.jdbc.ColumnMapping.DISABLE_PUSHDOWN;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.CharType.createCharType;
@@ -474,5 +489,27 @@ public final class StandardColumnMappings
                 return Optional.of(timestampColumnMappingUsingSqlTimestamp());
         }
         return Optional.empty();
+    }
+
+    private static final Map<Class<? extends Type>, Integer> PRESTO_TO_JDBC = ImmutableMap.<Class<? extends Type>, Integer>builder()
+            .put(BooleanType.class, Types.BOOLEAN)
+            .put(VarcharType.class, Types.VARCHAR)
+            .put(VarbinaryType.class, Types.VARBINARY)
+            .put(DateType.class, Types.DATE)
+            .put(IntegerType.class, Types.INTEGER)
+            .put(TimeType.class, Types.TIME)
+            .put(TimestampWithTimeZoneType.class, Types.TIMESTAMP_WITH_TIMEZONE)
+            .put(TimestampType.class, Types.TIMESTAMP)
+            .put(DoubleType.class, Types.DOUBLE)
+            .put(BigintType.class, Types.BIGINT)
+            .put(RealType.class, Types.DOUBLE)
+            .build();
+
+    public static Optional<Integer> prestoTypeToJdbcType(Type type)
+    {
+        if (PRESTO_TO_JDBC.containsKey(type.getClass())) {
+            return Optional.of(PRESTO_TO_JDBC.get(type.getClass()));
+        }
+        throw new PrestoException(NOT_SUPPORTED, "Type not supported for Iceberg: " + type.getDisplayName());
     }
 }

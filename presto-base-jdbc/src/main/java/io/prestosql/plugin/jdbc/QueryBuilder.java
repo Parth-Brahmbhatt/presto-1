@@ -121,7 +121,7 @@ public class QueryBuilder
         sql += getGroupBy(groupingSets);
 
         String query = sqlFunction.apply(sql);
-        log.debug("Preparing query: %s", query);
+        log.error("Preparing query: %s", query);
 
         for (int i = 0; i < accumulator.size(); i++) {
             TypeAndValue typeAndValue = accumulator.get(i);

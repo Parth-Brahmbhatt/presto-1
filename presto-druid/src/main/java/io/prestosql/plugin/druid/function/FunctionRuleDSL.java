@@ -27,12 +27,12 @@ import io.prestosql.spi.expression.FunctionCall;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.type.Type;
 
-import java.sql.Types;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static io.prestosql.matching.Capture.newCapture;
+import static io.prestosql.plugin.jdbc.StandardColumnMappings.prestoTypeToJdbcType;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.basicFunction;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.functionName;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.outputType;
@@ -141,19 +141,17 @@ public class FunctionRuleDSL
 
     private Optional<JdbcExpression> processConnectorExpression(Constant constant, RewriteContext context, boolean shouldQuoteStringLiterals)
     {
-        String value = constant.getValue().toString();
-        if (constant.getValue() instanceof Slice) {
-            if (shouldQuoteStringLiterals) {
-                value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
-            }
-            else {
-                value = ((Slice) constant.getValue()).toStringUtf8();
-            }
+        String value;
+        if (shouldQuoteStringLiterals) {
+            value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
         }
+        else {
+            value = ((Slice) constant.getValue()).toStringUtf8();
+        }
+
         return Optional.of(new JdbcExpression(
                 value,
-                new JdbcTypeHandle(Types.VARCHAR, Optional.empty(), 0, 0, Optional.empty(), Optional.empty()))
-        );
+                new JdbcTypeHandle(prestoTypeToJdbcType(constant.getType()).get(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
     }
 
     private Optional<JdbcExpression> processConnectorExpression(Variable variable, RewriteContext context, boolean shouldQuoteStringLiterals)
