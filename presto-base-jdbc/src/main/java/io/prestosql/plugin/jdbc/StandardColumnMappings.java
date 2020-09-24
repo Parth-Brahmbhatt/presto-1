@@ -17,7 +17,6 @@ import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.CharType;
@@ -56,7 +55,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static io.prestosql.plugin.jdbc.ColumnMapping.DISABLE_PUSHDOWN;
-import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.CharType.createCharType;
@@ -507,9 +505,7 @@ public final class StandardColumnMappings
 
     public static Optional<Integer> prestoTypeToJdbcType(Type type)
     {
-        if (PRESTO_TO_JDBC.containsKey(type.getClass())) {
-            return Optional.of(PRESTO_TO_JDBC.get(type.getClass()));
-        }
-        throw new PrestoException(NOT_SUPPORTED, "Type not supported for Iceberg: " + type.getDisplayName());
+        // TODO bad assumption that if type is not in mapping it must be a null
+            return Optional.of(PRESTO_TO_JDBC.getOrDefault(type.getClass(), Types.NULL));
     }
 }

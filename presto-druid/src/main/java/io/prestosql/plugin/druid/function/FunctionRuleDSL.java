@@ -26,7 +26,9 @@ import io.prestosql.spi.expression.Constant;
 import io.prestosql.spi.expression.FunctionCall;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarcharType;
 
+import java.sql.JDBCType;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -141,17 +143,29 @@ public class FunctionRuleDSL
 
     private Optional<JdbcExpression> processConnectorExpression(Constant constant, RewriteContext context, boolean shouldQuoteStringLiterals)
     {
+        // TODO can not handle nulls as druid does not have a way to just select NULL
+        if (constant.getValue() == null) {
+            return Optional.empty();
+        }
+
         String value;
-        if (shouldQuoteStringLiterals) {
-            value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
+        int size = 0;
+        if (constant.getType() instanceof VarcharType) {
+            size = ((VarcharType) constant.getType()).getLength().orElse(VarcharType.UNBOUNDED_LENGTH);
+            if (shouldQuoteStringLiterals) {
+                value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
+            }
+            else {
+                value = ((Slice) constant.getValue()).toStringUtf8();
+            }
         }
         else {
-            value = ((Slice) constant.getValue()).toStringUtf8();
+            value = String.format("CAST(%s as %s)", constant.getValue(), JDBCType.valueOf(prestoTypeToJdbcType(constant.getType()).get()).getName());
         }
 
         return Optional.of(new JdbcExpression(
                 value,
-                new JdbcTypeHandle(prestoTypeToJdbcType(constant.getType()).get(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+                new JdbcTypeHandle(prestoTypeToJdbcType(constant.getType()).get(), Optional.empty(), size, 0, Optional.empty(), Optional.empty())));
     }
 
     private Optional<JdbcExpression> processConnectorExpression(Variable variable, RewriteContext context, boolean shouldQuoteStringLiterals)

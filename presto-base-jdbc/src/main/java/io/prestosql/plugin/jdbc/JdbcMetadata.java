@@ -50,7 +50,9 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.statistics.TableStatistics;
+import io.prestosql.spi.type.VarcharType;
 
+import java.sql.JDBCType;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +67,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.plugin.jdbc.JdbcMetadataSessionProperties.isAllowAggregationPushdown;
+import static io.prestosql.plugin.jdbc.StandardColumnMappings.prestoTypeToJdbcType;
 import static io.prestosql.spi.StandardErrorCode.PERMISSION_DENIED;
 import static java.util.Objects.requireNonNull;
 
@@ -199,29 +202,41 @@ public class JdbcMetadata
             }
             else if (projection instanceof Constant) {
                 final Constant constant = (Constant) projection;
-                String value = constant.getValue().toString();
-                if (constant.getValue() instanceof Slice) {
-                    value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
+                if (constant.getValue() == null) {
+                    //TODO handle nulls
+                    resultProjections.add(projection);
                 }
-                final JdbcExpression constantExpression = new JdbcExpression(
-                        value,
-                        new JdbcTypeHandle(StandardColumnMappings.prestoTypeToJdbcType(projection.getType()).get(),
-                                Optional.empty(),
-                                0,
-                                0,
-                                Optional.empty(),
-                                Optional.empty()));
-                JdbcColumnHandle newColumn = JdbcColumnHandle.builder()
-                        .setExpression(Optional.of(constantExpression.getExpression()))
-                        .setColumnName(SYNTHETIC_COLUMN_NAME_PREFIX + "_constant_" + syntheticNextIdentifier)
-                        .setJdbcTypeHandle(constantExpression.getJdbcTypeHandle())
-                        .setColumnType(projection.getType())
-                        .setComment(Optional.of("synthetic"))
-                        .build();
-                syntheticNextIdentifier++;
+                else {
+                    String value;
+                    int size = 0;
+                    if (constant.getType() instanceof VarcharType) {
+                        value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
+                        size = ((VarcharType) constant.getType()).getLength().orElse(VarcharType.UNBOUNDED_LENGTH);
+                    }
+                    else {
+                        value = String.format("CAST(%s as %s)", constant.getValue(), JDBCType.valueOf(prestoTypeToJdbcType(constant.getType()).get()).getName());
+                    }
 
-                resultProjections.add(new Variable(newColumn.getColumnName(), projection.getType()));
-                resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, projection.getType()));
+                    final JdbcExpression constantExpression = new JdbcExpression(
+                            value,
+                            new JdbcTypeHandle(StandardColumnMappings.prestoTypeToJdbcType(projection.getType()).get(),
+                                    Optional.empty(),
+                                    size,
+                                    0,
+                                    Optional.empty(),
+                                    Optional.empty()));
+                    JdbcColumnHandle newColumn = JdbcColumnHandle.builder()
+                            .setExpression(Optional.of(constantExpression.getExpression()))
+                            .setColumnName(SYNTHETIC_COLUMN_NAME_PREFIX + "_constant_" + syntheticNextIdentifier)
+                            .setJdbcTypeHandle(constantExpression.getJdbcTypeHandle())
+                            .setColumnType(projection.getType())
+                            .setComment(Optional.of("synthetic"))
+                            .build();
+                    syntheticNextIdentifier++;
+
+                    resultProjections.add(new Variable(newColumn.getColumnName(), projection.getType()));
+                    resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, projection.getType()));
+                }
             }
             else {
                 resultProjections.add(projection);
