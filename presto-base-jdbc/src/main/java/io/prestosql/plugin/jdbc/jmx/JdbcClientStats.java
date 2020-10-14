@@ -48,7 +48,7 @@ public final class JdbcClientStats
     private final JdbcApiStats getColumnMappings = new JdbcApiStats();
     private final JdbcApiStats toWriteMapping = new JdbcApiStats();
     private final JdbcApiStats implementAggregation = new JdbcApiStats();
-    private final JdbcApiStats implementFunction = new JdbcApiStats();
+    private final JdbcApiStats handleConnectorExpression = new JdbcApiStats();
 
     @Managed
     @Nested
@@ -262,8 +262,8 @@ public final class JdbcClientStats
 
     @Managed
     @Nested
-    public JdbcApiStats getImplementFunction()
+    public JdbcApiStats getHandleConnectorExpression()
     {
-        return implementFunction;
+        return handleConnectorExpression;
     }
 }

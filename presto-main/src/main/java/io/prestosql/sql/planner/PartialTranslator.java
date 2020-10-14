@@ -48,7 +48,7 @@ public final class PartialTranslator
         requireNonNull(typeProvider, "typeProvider is null");
 
         Map<NodeRef<Expression>, ConnectorExpression> partialTranslations = new HashMap<>();
-        new Visitor(typeAnalyzer.getTypes(session, typeProvider, inputExpression), partialTranslations).process(inputExpression);
+        new Visitor(typeAnalyzer.getTypes(session, typeProvider, inputExpression), typeAnalyzer, partialTranslations).process(inputExpression);
         return ImmutableMap.copyOf(partialTranslations);
     }
 
@@ -58,17 +58,21 @@ public final class PartialTranslator
         private final Map<NodeRef<Expression>, ConnectorExpression> translatedSubExpressions;
         private final ConnectorExpressionTranslator.SqlToConnectorExpressionTranslator translator;
 
-        Visitor(Map<NodeRef<Expression>, Type> types, Map<NodeRef<Expression>, ConnectorExpression> translatedSubExpressions)
+        Visitor(Map<NodeRef<Expression>, Type> types, TypeAnalyzer typeAnalyzer, Map<NodeRef<Expression>, ConnectorExpression> translatedSubExpressions)
         {
             requireNonNull(types, "types is null");
             this.translatedSubExpressions = requireNonNull(translatedSubExpressions, "translatedSubExpressions is null");
-            this.translator = new ConnectorExpressionTranslator.SqlToConnectorExpressionTranslator(types);
+            this.translator = new ConnectorExpressionTranslator.SqlToConnectorExpressionTranslator(types, typeAnalyzer);
         }
 
         @Override
         public Void visitExpression(Expression node, Void context)
         {
             Optional<ConnectorExpression> result = translator.process(node);
+
+            if (result == null) {
+                return null;
+            }
 
             if (result.isPresent()) {
                 translatedSubExpressions.put(NodeRef.of(node), result.get());

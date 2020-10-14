@@ -13,27 +13,26 @@
  */
 package io.prestosql.spi.expression;
 
-import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.BooleanType;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
 
-public class FunctionCall
+public class InExpression
         extends ConnectorExpression
 {
-    private final String name;
-    private final List<ConnectorExpression> arguments;
-
-    public FunctionCall(String name, List<ConnectorExpression> arguments, Type type)
+    public InExpression(ConnectorExpression value, ConnectorExpression valueList)
     {
-        super(type);
-        this.name = requireNonNull(name, "name can not be null");
-        this.arguments = List.copyOf(requireNonNull(arguments, "arguments can not be null"));
+        super(BooleanType.BOOLEAN);
+        this.value = value;
+        this.valueList = valueList;
     }
+
+    private ConnectorExpression value;
+    private ConnectorExpression valueList;
 
     @Override
     public List<? extends ConnectorExpression> getChildren()
@@ -41,23 +40,14 @@ public class FunctionCall
         return emptyList();
     }
 
-    public String getName()
+    public ConnectorExpression getValue()
     {
-        return name;
+        return value;
     }
 
-    public List<ConnectorExpression> getArguments()
+    public ConnectorExpression getValueList()
     {
-        return arguments;
-    }
-
-    @Override
-    public String toString()
-    {
-        return new StringJoiner(", ", FunctionCall.class.getSimpleName() + "[", "]")
-                .add("name='" + name + "'")
-                .add("arguments=" + arguments)
-                .toString();
+        return valueList;
     }
 
     @Override
@@ -71,14 +61,23 @@ public class FunctionCall
             return false;
         }
 
-        FunctionCall that = (FunctionCall) o;
-        return Objects.equals(name, that.name) &&
-                Objects.equals(arguments, that.arguments);
+        InExpression that = (InExpression) o;
+        return Objects.equals(value, that.value) &&
+                Objects.equals(valueList, that.valueList);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, arguments);
+        return Objects.hash(value, valueList);
+    }
+
+    @Override
+    public String toString()
+    {
+        return new StringJoiner(", ", InExpression.class.getSimpleName() + "[", "]")
+                .add("value=" + value)
+                .add("valueList=" + valueList)
+                .toString();
     }
 }

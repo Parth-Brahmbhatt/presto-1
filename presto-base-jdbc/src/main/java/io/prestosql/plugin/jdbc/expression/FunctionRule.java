@@ -13,10 +13,8 @@
  */
 package io.prestosql.plugin.jdbc.expression;
 
-import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
-import io.prestosql.plugin.jdbc.JdbcExpression;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.expression.FunctionCall;
@@ -29,8 +27,6 @@ public interface FunctionRule
 {
     Pattern<FunctionCall> getPattern();
 
-    Optional<JdbcExpression> rewrite(FunctionCall function, Captures captures, FunctionRule.RewriteContext context);
-
     String getPrestoName();
 
     Optional<String> expressionFormat();
@@ -42,8 +38,6 @@ public interface FunctionRule
     interface RewriteContext
     {
         Map<String, JdbcColumnHandle> getAssignments();
-
-        Optional<FunctionRule> getRule(String name);
 
         Function<String, String> getIdentifierQuote();
 

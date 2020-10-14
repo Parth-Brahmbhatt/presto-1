@@ -506,6 +506,6 @@ public final class StandardColumnMappings
     public static Optional<Integer> prestoTypeToJdbcType(Type type)
     {
         // TODO bad assumption that if type is not in mapping it must be a null
-            return Optional.of(PRESTO_TO_JDBC.getOrDefault(type.getClass(), Types.NULL));
+        return Optional.of(PRESTO_TO_JDBC.getOrDefault(type.getClass(), Types.NULL));
     }
 }

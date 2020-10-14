@@ -13,8 +13,10 @@
  */
 package io.prestosql.plugin.druid;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.slice.Slice;
 import io.prestosql.plugin.druid.aggregate.SingleInputAggregateFunction;
 import io.prestosql.plugin.druid.function.FunctionRuleDSL;
 import io.prestosql.plugin.jdbc.BaseJdbcClient;
@@ -42,7 +44,17 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.expression.CaseExpression;
+import io.prestosql.spi.expression.Cast;
+import io.prestosql.spi.expression.ComparisonExpression;
+import io.prestosql.spi.expression.ConnectorExpression;
+import io.prestosql.spi.expression.Constant;
 import io.prestosql.spi.expression.FunctionCall;
+import io.prestosql.spi.expression.InExpression;
+import io.prestosql.spi.expression.InListExpression;
+import io.prestosql.spi.expression.Operator;
+import io.prestosql.spi.expression.Variable;
+import io.prestosql.spi.expression.WhenClause;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
@@ -51,6 +63,7 @@ import javax.inject.Inject;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -68,6 +81,7 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
+import static io.prestosql.plugin.jdbc.StandardColumnMappings.prestoTypeToJdbcType;
 import static io.prestosql.plugin.jdbc.StandardColumnMappings.varcharColumnMapping;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -75,6 +89,7 @@ import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
+import static java.util.stream.Collectors.toList;
 
 public class DruidJdbcClient
         extends BaseJdbcClient
@@ -106,6 +121,248 @@ public class DruidJdbcClient
     protected Collection<String> listSchemas(Connection connection)
     {
         return ImmutableList.of(DRUID_SCHEMA);
+    }
+
+    @Override
+    public Optional<JdbcExpression> handleConnectorExpression(ConnectorSession session, ConnectorExpression connectorExpression, Map<String, ColumnHandle> assignments)
+    {
+        final Map<String, JdbcColumnHandle> columnHandleMap = assignments.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, column -> (JdbcColumnHandle) column.getValue()));
+
+        final FunctionRule.RewriteContext context = functionRewriter.getContext(session, columnHandleMap);
+        return processConnectorExpression(connectorExpression, context, true);
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(ConnectorExpression connectorExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        if (connectorExpression instanceof FunctionCall) {
+            return processConnectorExpression((FunctionCall) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof Variable) {
+            return processConnectorExpression((Variable) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof Constant) {
+            return processConnectorExpression((Constant) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof Cast) {
+            return processConnectorExpression((Cast) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof ComparisonExpression) {
+            return processConnectorExpression((ComparisonExpression) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof WhenClause) {
+            return processConnectorExpression((WhenClause) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof CaseExpression) {
+            return processConnectorExpression((CaseExpression) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof InExpression) {
+            return processConnectorExpression((InExpression) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof InListExpression) {
+            return processConnectorExpression((InListExpression) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        return Optional.empty();
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(FunctionCall function, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        for (FunctionRule rule : functionRules()) {
+            if(rule.getPattern().matches(function, context)) {
+                final Optional<String> expressionFormat = rule.expressionFormat();
+                final JdbcTypeHandle jdbcTypeHandle = rule.getJdbcTypeHandle();
+                String expression = expressionFormat.orElse(rule.getPrestoName() + "(%s)");
+                final List<String> arguments = function.getArguments().stream()
+                        .map(arg -> processConnectorExpression(arg, context, rule.shouldQuoteStringLiterals()))
+                        .filter(Optional::isPresent)
+                        .map(arg -> arg.get().getExpression())
+                        .collect(toList());
+
+                if (arguments.size() != function.getArguments().size()) {
+                    continue;
+                }
+                expression = String.format(expression, Joiner.on(",").join(arguments));
+
+                return Optional.of(new JdbcExpression(expression, jdbcTypeHandle));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<JdbcExpression> processConnectorExpression(Variable variable, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        return Optional.of(new JdbcExpression(
+                context.getAssignments().get(variable.getName()).toSqlExpression(name -> context.getIdentifierQuote().apply(name)),
+                context.getAssignments().get(variable.getName()).getJdbcTypeHandle()
+        ));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(Constant constant, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        // TODO can not handle nulls as druid does not have a way to just select NULL
+        if (constant.getValue() == null) {
+            return Optional.empty();
+        }
+
+        String value;
+        int size = 0;
+        if (constant.getType() instanceof VarcharType) {
+            size = ((VarcharType) constant.getType()).getLength().orElse(VarcharType.UNBOUNDED_LENGTH);
+            if (shouldQuoteStringLiterals) {
+                value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
+            }
+            else {
+                value = ((Slice) constant.getValue()).toStringUtf8();
+            }
+        }
+        else {
+            value = String.format("CAST(%s as %s)", constant.getValue(), JDBCType.valueOf(prestoTypeToJdbcType(constant.getType()).get()).getName());
+        }
+
+        return Optional.of(new JdbcExpression(
+                value,
+                new JdbcTypeHandle(prestoTypeToJdbcType(constant.getType()).get(), Optional.empty(), size, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(Cast cast, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        final Optional<JdbcExpression> expression = processConnectorExpression(cast.getExpression(), context, shouldQuoteStringLiterals);
+        if (expression.isEmpty()) {
+            return Optional.empty();
+        }
+        String jdbcExpression = String.format("CAST(%s as %s)", expression.get().getExpression(), JDBCType.valueOf(prestoTypeToJdbcType(cast.getType()).get()).getName());
+        int size = 0;
+        if (cast.getType() instanceof VarcharType) {
+            size = ((VarcharType) cast.getType()).getLength().orElse(VarcharType.UNBOUNDED_LENGTH);
+        }
+
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(prestoTypeToJdbcType(cast.getType()).get(), Optional.empty(), size, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(ComparisonExpression comparisonExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        final Optional<JdbcExpression> left = processConnectorExpression(comparisonExpression.getLeft(), context, shouldQuoteStringLiterals);
+        final Optional<JdbcExpression> right = processConnectorExpression(comparisonExpression.getRight(), context, shouldQuoteStringLiterals);
+        final Optional<String> operator = processOperator(comparisonExpression.getOperator());
+        if (left.isEmpty() || right.isEmpty() || operator.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String jdbcExpression = String.format("%s %s %s", left.get().getExpression(), operator.get(), right.get().getExpression());
+
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(JDBCType.BOOLEAN.getVendorTypeNumber(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(WhenClause whenClause, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        final Optional<JdbcExpression> operand = processConnectorExpression(whenClause.getOperand(), context, shouldQuoteStringLiterals);
+        final Optional<JdbcExpression> result = processConnectorExpression(whenClause.getResult(), context, shouldQuoteStringLiterals);
+        if (operand.isEmpty() || result.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String jdbcExpression = String.format("WHEN %s THEN %s", operand.get().getExpression(), result.get().getExpression());
+
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(prestoTypeToJdbcType(whenClause.getType()).get(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(CaseExpression caseExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        Optional<JdbcExpression> defaultValue = Optional.empty();
+        if (caseExpression.getDefaultValue().isPresent()) {
+            defaultValue = processConnectorExpression(caseExpression.getDefaultValue().get(), context, shouldQuoteStringLiterals);
+            if (defaultValue.isEmpty()) {
+                return Optional.empty();
+            }
+        }
+
+        Optional<JdbcExpression> operand = Optional.empty();
+        if (caseExpression.getOperand().isPresent()) {
+            operand = processConnectorExpression(caseExpression.getOperand().get(), context, shouldQuoteStringLiterals);
+            if (operand.isEmpty()) {
+                return Optional.empty();
+            }
+        }
+
+        final List<String> whenClauses = caseExpression.getWhenClauses().stream()
+                .map(when -> processConnectorExpression(when, context, shouldQuoteStringLiterals))
+                .filter(Optional::isPresent)
+                .map(when -> when.get().getExpression())
+                .collect(toList());
+
+        if (whenClauses.size() != caseExpression.getWhenClauses().size()) {
+            return Optional.empty();
+        }
+
+        String operandExpression = operand.map(JdbcExpression::getExpression).orElse("");
+        String whenExpression = String.join("\n", whenClauses);
+        String defaultExpression = defaultValue.map(val -> String.format(" ELSE %s", val.getExpression())).orElse("");
+        String jdbcExpression = String.format("CASE %s %s %s END", operandExpression, whenExpression, defaultExpression);
+
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(prestoTypeToJdbcType(caseExpression.getType()).get(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(InExpression inExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        final Optional<JdbcExpression> value = processConnectorExpression(inExpression.getValue(), context, shouldQuoteStringLiterals);
+        final Optional<JdbcExpression> valueList = processConnectorExpression(inExpression.getValueList(), context, shouldQuoteStringLiterals);
+        if (value.isEmpty() || valueList.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String jdbcExpression = String.format("%s IN (%s)", value.get().getExpression(), valueList.get().getExpression());
+
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(JDBCType.BOOLEAN.getVendorTypeNumber(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(InListExpression inListExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        final List<JdbcExpression> inExpressions = inListExpression.getValues().stream()
+                .map(value -> processConnectorExpression(value, context, shouldQuoteStringLiterals))
+                .filter(x -> x.isPresent())
+                .map(Optional::get)
+                .collect(toList());
+
+        if (inExpressions.size() != inListExpression.getValues().size()) {
+            return Optional.empty();
+        }
+        final String jdbcExpression = inExpressions.stream()
+                .map(JdbcExpression::getExpression)
+                .collect(Collectors.joining(","));
+
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(JDBCType.BOOLEAN.getVendorTypeNumber(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<String> processOperator(Operator operator)
+    {
+        switch (operator) {
+            case EQUAL:
+                return Optional.of("=");
+            case NOT_EQUAL:
+                return Optional.of("<>");
+            case LESS_THAN:
+                return Optional.of("<");
+            case LESS_THAN_OR_EQUAL:
+                return Optional.of("<=");
+            case GREATER_THAN:
+                return Optional.of(">");
+            case GREATER_THAN_OR_EQUAL:
+                return Optional.of(">=");
+            default:
+                return Optional.empty();
+        }
     }
 
     //Overridden to filter out tables that don't match schemaTableName
@@ -182,14 +439,6 @@ public class DruidJdbcClient
     public Optional<JdbcExpression> implementAggregation(ConnectorSession session, AggregateFunction aggregate, Map<String, ColumnHandle> assignments)
     {
         return aggregateFunctionRewriter.rewrite(session, aggregate, assignments);
-    }
-
-    @Override
-    public Optional<JdbcExpression> implementFunction(ConnectorSession session, FunctionCall function, Map<String, ColumnHandle> assignments)
-    {
-        final Map<String, JdbcColumnHandle> columnHandleMap = assignments.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, column -> (JdbcColumnHandle) column.getValue()));
-        return functionRewriter.rewrite(session, function, columnHandleMap);
     }
 
     // Druid doesn't like table names to be qualified with catalog names in the SQL query.
@@ -402,9 +651,8 @@ public class DruidJdbcClient
         return builder.build();
     }
 
-    private Set<FunctionRule> functionRules()
+    private static Set<FunctionRule> functionRules()
     {
-
         JdbcTypeHandle bigIntHandle = new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), 0, 0, Optional.empty(), Optional.empty());
         JdbcTypeHandle doubleHandle = new JdbcTypeHandle(Types.DOUBLE, Optional.of("double"), 0, 0, Optional.empty(), Optional.empty());
         JdbcTypeHandle timestampHandle = new JdbcTypeHandle(Types.TIMESTAMP, Optional.of("timestamp"), 0, 0, Optional.empty(), Optional.empty());
@@ -661,5 +909,4 @@ public class DruidJdbcClient
         // MATH Functions, need single input as output types depend on input types
         return builder.build();
     }
-
 }

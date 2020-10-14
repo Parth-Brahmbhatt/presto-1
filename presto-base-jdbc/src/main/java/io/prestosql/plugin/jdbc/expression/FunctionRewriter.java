@@ -13,15 +13,10 @@
  */
 package io.prestosql.plugin.jdbc.expression;
 
-import io.prestosql.matching.Match;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
-import io.prestosql.plugin.jdbc.JdbcExpression;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.expression.FunctionCall;
 
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -41,23 +36,16 @@ public class FunctionRewriter
                 .collect(Collectors.toMap(FunctionRule::getPrestoName, Function.identity()));
     }
 
-    public Optional<JdbcExpression> rewrite(ConnectorSession session, FunctionCall function, Map<String, JdbcColumnHandle> assignments)
+    public FunctionRule.RewriteContext getContext(ConnectorSession session, Map<String, JdbcColumnHandle> assignments)
     {
-        requireNonNull(function, "Function is null");
         requireNonNull(assignments, "assignments is null");
 
-        FunctionRule.RewriteContext context = new FunctionRule.RewriteContext()
+        return new FunctionRule.RewriteContext()
         {
             @Override
             public Map<String, JdbcColumnHandle> getAssignments()
             {
                 return assignments;
-            }
-
-            @Override
-            public Optional<FunctionRule> getRule(String name)
-            {
-                return Optional.ofNullable(rules.get(name));
             }
 
             @Override
@@ -72,17 +60,5 @@ public class FunctionRewriter
                 return session;
             }
         };
-
-        for (FunctionRule rule : rules.values()) {
-            Iterator<Match> matches = rule.getPattern().match(function, context).iterator();
-            while (matches.hasNext()) {
-                Match match = matches.next();
-                Optional<JdbcExpression> rewritten = rule.rewrite(function, match.captures(), context);
-                if (rewritten.isPresent()) {
-                    return rewritten;
-                }
-            }
-        }
-        return Optional.empty();
     }
 }

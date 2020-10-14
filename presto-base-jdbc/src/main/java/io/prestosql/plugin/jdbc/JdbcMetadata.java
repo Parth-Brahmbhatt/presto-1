@@ -41,6 +41,8 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.connector.TableNotFoundException;
+import io.prestosql.spi.expression.CaseExpression;
+import io.prestosql.spi.expression.ComparisonExpression;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.Constant;
 import io.prestosql.spi.expression.FunctionCall;
@@ -183,21 +185,20 @@ public class JdbcMetadata
         ImmutableList.Builder<Assignment> resultAssignmentsBuilder = ImmutableList.builder();
         ImmutableList.Builder<ConnectorExpression> resultProjections = ImmutableList.builder();
         for (ConnectorExpression projection : projections) {
-            if (projection instanceof FunctionCall) {
-                FunctionCall functionCall = (FunctionCall) projection;
-                final Optional<JdbcExpression> jdbcExpression = jdbcClient.implementFunction(session, functionCall, assignments);
+            if (projection instanceof FunctionCall || projection instanceof ComparisonExpression || projection instanceof CaseExpression) {
+                final Optional<JdbcExpression> jdbcExpression = jdbcClient.handleConnectorExpression(session, projection, assignments);
                 if (jdbcExpression.isPresent()) {
                     JdbcColumnHandle newColumn = JdbcColumnHandle.builder()
                             .setExpression(Optional.of(jdbcExpression.get().getExpression()))
-                            .setColumnName(SYNTHETIC_COLUMN_NAME_PREFIX + "_function_" +syntheticNextIdentifier)
+                            .setColumnName(SYNTHETIC_COLUMN_NAME_PREFIX + "_function_" + syntheticNextIdentifier)
                             .setJdbcTypeHandle(jdbcExpression.get().getJdbcTypeHandle())
-                            .setColumnType(functionCall.getType())
+                            .setColumnType(projection.getType())
                             .setComment(Optional.of("synthetic"))
                             .build();
                     syntheticNextIdentifier++;
 
-                    resultProjections.add(new Variable(newColumn.getColumnName(), functionCall.getType()));
-                    resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, functionCall.getType()));
+                    resultProjections.add(new Variable(newColumn.getColumnName(), projection.getType()));
+                    resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, projection.getType()));
                 }
             }
             else if (projection instanceof Constant) {
@@ -251,7 +252,7 @@ public class JdbcMetadata
 
         final ImmutableList<Assignment> resultAssignments = resultAssignmentsBuilder.build();
         List<JdbcColumnHandle> newColumns = resultAssignments.stream()
-                .map(assignment -> (JdbcColumnHandle)(assignment.getColumn()))
+                .map(assignment -> (JdbcColumnHandle) (assignment.getColumn()))
                 .collect(toImmutableList());
 
         if (handle.getColumns().isPresent() && containSameElements(newColumns, handle.getColumns().get())) {

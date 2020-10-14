@@ -17,11 +17,9 @@ import io.prestosql.matching.Pattern;
 import io.prestosql.matching.Property;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.FunctionCall;
-import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
-import java.util.Optional;
 
 public class FunctionPatterns
 {

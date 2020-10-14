@@ -14,18 +14,24 @@
 package io.prestosql.sql.planner;
 
 import io.prestosql.Session;
+import io.prestosql.spi.expression.CaseExpression;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.Constant;
 import io.prestosql.spi.expression.FieldDereference;
+import io.prestosql.spi.expression.Operator;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.type.Decimals;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.analyzer.TypeSignatureTranslator;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BinaryLiteral;
 import io.prestosql.sql.tree.BooleanLiteral;
+import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CharLiteral;
+import io.prestosql.sql.tree.ComparisonExpression;
+import io.prestosql.sql.tree.DataType;
 import io.prestosql.sql.tree.DecimalLiteral;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.DoubleLiteral;
@@ -33,11 +39,16 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FunctionCall;
 import io.prestosql.sql.tree.GenericLiteral;
 import io.prestosql.sql.tree.Identifier;
+import io.prestosql.sql.tree.InListExpression;
+import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NullLiteral;
+import io.prestosql.sql.tree.SearchedCaseExpression;
+import io.prestosql.sql.tree.SimpleCaseExpression;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.sql.tree.WhenClause;
 
 import java.math.BigInteger;
 import java.util.List;
@@ -67,7 +78,7 @@ public final class ConnectorExpressionTranslator
 
     public static Optional<ConnectorExpression> translate(Session session, Expression expression, TypeAnalyzer types, TypeProvider inputTypes)
     {
-        return new SqlToConnectorExpressionTranslator(types.getTypes(session, inputTypes, expression))
+        return new SqlToConnectorExpressionTranslator(types.getTypes(session, inputTypes, expression), types)
                 .process(expression);
     }
 
@@ -108,10 +119,12 @@ public final class ConnectorExpressionTranslator
             extends AstVisitor<Optional<ConnectorExpression>, Void>
     {
         private final Map<NodeRef<Expression>, Type> types;
+        private final TypeAnalyzer typeAnalyzer;
 
-        public SqlToConnectorExpressionTranslator(Map<NodeRef<Expression>, Type> types)
+        public SqlToConnectorExpressionTranslator(Map<NodeRef<Expression>, Type> types, TypeAnalyzer typeAnalyzer)
         {
             this.types = requireNonNull(types, "types is null");
+            this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
         }
 
         @Override
@@ -179,6 +192,83 @@ public final class ConnectorExpressionTranslator
         }
 
         @Override
+        protected Optional<ConnectorExpression> visitCast(Cast cast, Void context)
+        {
+            final Optional<ConnectorExpression> expression = process(cast.getExpression());
+            if (expression == null || expression.isEmpty()) {
+                return Optional.empty();
+            }
+
+            final Type type = getType(cast.getType());
+            if (type == null) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new io.prestosql.spi.expression.Cast(expression.get(), type, cast.isSafe(), cast.isTypeOnly()));
+        }
+
+        private Type getType(DataType dataType)
+        {
+            return typeAnalyzer.getType(TypeSignatureTranslator.toTypeSignature(dataType));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitWhenClause(WhenClause when, Void context)
+        {
+            final Optional<ConnectorExpression> operand = process(when.getOperand(), context);
+            final Optional<ConnectorExpression> result = process(when.getResult(), context);
+            if (operand == null || result == null || operand.isEmpty() || result.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(new io.prestosql.spi.expression.WhenClause(operand.get(), result.get()));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitFunctionCall(FunctionCall functionCall, Void context)
+        {
+            if (functionCall.isDistinct() || functionCall.getWindow().isPresent() || functionCall.getFilter().isPresent() || functionCall.getOrderBy().isPresent() || functionCall.getNullTreatment().isPresent()) {
+                return Optional.empty();
+            }
+            final List<ConnectorExpression> arguments = functionCall.getArguments().stream()
+                    .map(expression -> process(expression, context))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .collect(Collectors.toList());
+
+            if (arguments.size() != functionCall.getArguments().size()) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new io.prestosql.spi.expression.FunctionCall(extractFunctionName(functionCall.getName()), arguments, typeOf(functionCall)));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitSimpleCaseExpression(SimpleCaseExpression caseExpression, Void context)
+        {
+            Optional<ConnectorExpression> defaultValue = Optional.empty();
+            if (caseExpression.getDefaultValue().isPresent()) {
+                defaultValue = process(caseExpression.getDefaultValue().get(), context);
+                if (defaultValue == null || defaultValue.isEmpty()) {
+                    return Optional.empty();
+                }
+            }
+            final Optional<ConnectorExpression> operand = process(caseExpression.getOperand(), context);
+            if (operand == null || operand.isEmpty()) {
+                return Optional.empty();
+            }
+
+            final List<io.prestosql.spi.expression.WhenClause> whenClauses = caseExpression.getWhenClauses().stream()
+                    .map(clause -> process(clause, context))
+                    .filter(Optional::isPresent)
+                    .map(e -> (io.prestosql.spi.expression.WhenClause) e.get())
+                    .collect(Collectors.toList());
+            if (whenClauses.size() != caseExpression.getWhenClauses().size()) {
+                return Optional.empty();
+            }
+            return Optional.of(new CaseExpression(operand, whenClauses, defaultValue));
+        }
+
+        @Override
         protected Optional<ConnectorExpression> visitCharLiteral(CharLiteral node, Void context)
         {
             return Optional.of(new Constant(node.getSlice(), typeOf(node)));
@@ -200,6 +290,28 @@ public final class ConnectorExpressionTranslator
         protected Optional<ConnectorExpression> visitNullLiteral(NullLiteral node, Void context)
         {
             return Optional.of(new Constant(null, typeOf(node)));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitSearchedCaseExpression(SearchedCaseExpression caseExpression, Void context)
+        {
+            Optional<ConnectorExpression> defaultValue = Optional.empty();
+            if (caseExpression.getDefaultValue().isPresent()) {
+                defaultValue = process(caseExpression.getDefaultValue().get(), context);
+                if (defaultValue == null || defaultValue.isEmpty()) {
+                    return Optional.empty();
+                }
+            }
+
+            final List<io.prestosql.spi.expression.WhenClause> whenClauses = caseExpression.getWhenClauses().stream()
+                    .map(clause -> process(clause, context))
+                    .filter(Optional::isPresent)
+                    .map(e -> (io.prestosql.spi.expression.WhenClause) e.get())
+                    .collect(Collectors.toList());
+            if (whenClauses.size() != caseExpression.getWhenClauses().size()) {
+                return Optional.empty();
+            }
+            return Optional.of(new CaseExpression(Optional.empty(), whenClauses, defaultValue));
         }
 
         @Override
@@ -228,31 +340,80 @@ public final class ConnectorExpressionTranslator
         }
 
         @Override
-        protected Optional<ConnectorExpression> visitExpression(Expression node, Void context)
+        protected Optional<ConnectorExpression> visitComparisonExpression(ComparisonExpression comparisonExpression, Void context)
         {
-            if(node instanceof FunctionCall) {
-                FunctionCall functionCall = (FunctionCall) node;
-                if(functionCall.isDistinct() || functionCall.getWindow().isPresent() || functionCall.getFilter().isPresent() || functionCall.getOrderBy().isPresent() || functionCall.getNullTreatment().isPresent()) {
-                    return Optional.empty();
-                }
-                final List<ConnectorExpression> arguments = functionCall.getArguments().stream()
-                        .map(expression -> process(expression, context))
-                        .filter(arg -> arg.isPresent())
-                        .map(arg -> arg.get())
-                        .collect(Collectors.toList());
-
-                if(arguments.size() != functionCall.getArguments().size()) {
-                    return Optional.empty();
-                }
-
-                return Optional.of(new io.prestosql.spi.expression.FunctionCall(extractFunctionName(functionCall.getName()), arguments, typeOf(node)));
+            final Optional<ConnectorExpression> leftExpression = process(comparisonExpression.getLeft(), context);
+            if (leftExpression == null || leftExpression.isEmpty()) {
+                return Optional.empty();
             }
-            return Optional.empty();
+            final Optional<ConnectorExpression> rightExpression = process(comparisonExpression.getRight(), context);
+            if (rightExpression == null || rightExpression.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(
+                    new io.prestosql.spi.expression.ComparisonExpression(
+                            operator(comparisonExpression.getOperator()),
+                            leftExpression.get(),
+                            rightExpression.get()));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitInPredicate(InPredicate node, Void context)
+        {
+            final Optional<ConnectorExpression> value = process(node.getValue(), context);
+            if (value == null || value.isEmpty()) {
+                return Optional.empty();
+            }
+            final Optional<ConnectorExpression> valueList = process(node.getValueList(), context);
+            if (valueList == null || valueList.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(
+                    new io.prestosql.spi.expression.InExpression(
+                            value.get(),
+                            valueList.get()));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitInListExpression(InListExpression node, Void context)
+        {
+            final List<ConnectorExpression> values = node.getValues().stream()
+                    .map(value -> process(value, context))
+                    .filter(x -> x != null && x.isPresent())
+                    .map(Optional::get)
+                    .collect(Collectors.toList());
+
+            if (values.size() != node.getValues().size()) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new io.prestosql.spi.expression.InListExpression(values));
         }
 
         private Type typeOf(Expression node)
         {
             return types.get(NodeRef.of(node));
+        }
+
+        private Operator operator(ComparisonExpression.Operator operator)
+        {
+            switch (operator) {
+                case EQUAL:
+                    return Operator.EQUAL;
+                case NOT_EQUAL:
+                    return Operator.NOT_EQUAL;
+                case LESS_THAN:
+                    return Operator.LESS_THAN;
+                case LESS_THAN_OR_EQUAL:
+                    return Operator.LESS_THAN_OR_EQUAL;
+                case GREATER_THAN:
+                    return Operator.GREATER_THAN;
+                case GREATER_THAN_OR_EQUAL:
+                    return Operator.GREATER_THAN_OR_EQUAL;
+                case IS_DISTINCT_FROM:
+                    return Operator.IS_DISTINCT_FROM;
+            }
+            return null;
         }
     }
 }

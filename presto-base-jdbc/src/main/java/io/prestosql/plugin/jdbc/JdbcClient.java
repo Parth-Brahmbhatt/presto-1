@@ -21,7 +21,7 @@ import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SystemTable;
-import io.prestosql.spi.expression.FunctionCall;
+import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.Type;
@@ -68,7 +68,7 @@ public interface JdbcClient
         return Optional.empty();
     }
 
-    default Optional<JdbcExpression> implementFunction(ConnectorSession session, FunctionCall functionCall, Map<String, ColumnHandle> assignments)
+    default Optional<JdbcExpression> handleConnectorExpression(ConnectorSession session, ConnectorExpression connectorExpression, Map<String, ColumnHandle> assignments)
     {
         return Optional.empty();
     }

@@ -20,6 +20,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NodeRef;
@@ -60,5 +61,10 @@ public class TypeAnalyzer
     public Type getType(Session session, TypeProvider inputTypes, Expression expression)
     {
         return getTypes(session, inputTypes, expression).get(NodeRef.of(expression));
+    }
+
+    public Type getType(TypeSignature typeSignature)
+    {
+        return this.metadata.getType(typeSignature);
     }
 }

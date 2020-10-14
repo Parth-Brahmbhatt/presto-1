@@ -13,26 +13,23 @@
  */
 package io.prestosql.spi.expression;
 
-import io.prestosql.spi.type.Type;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
 
-public class FunctionCall
+public class WhenClause
         extends ConnectorExpression
 {
-    private final String name;
-    private final List<ConnectorExpression> arguments;
+    private final ConnectorExpression operand;
+    private final ConnectorExpression result;
 
-    public FunctionCall(String name, List<ConnectorExpression> arguments, Type type)
+    public WhenClause(ConnectorExpression operand, ConnectorExpression result)
     {
-        super(type);
-        this.name = requireNonNull(name, "name can not be null");
-        this.arguments = List.copyOf(requireNonNull(arguments, "arguments can not be null"));
+        super(result.getType());
+        this.operand = operand;
+        this.result = result;
     }
 
     @Override
@@ -41,22 +38,22 @@ public class FunctionCall
         return emptyList();
     }
 
-    public String getName()
+    public ConnectorExpression getOperand()
     {
-        return name;
+        return operand;
     }
 
-    public List<ConnectorExpression> getArguments()
+    public ConnectorExpression getResult()
     {
-        return arguments;
+        return result;
     }
 
     @Override
     public String toString()
     {
-        return new StringJoiner(", ", FunctionCall.class.getSimpleName() + "[", "]")
-                .add("name='" + name + "'")
-                .add("arguments=" + arguments)
+        return new StringJoiner(", ", WhenClause.class.getSimpleName() + "[", "]")
+                .add("operand=" + operand)
+                .add("result=" + result)
                 .toString();
     }
 
@@ -71,14 +68,14 @@ public class FunctionCall
             return false;
         }
 
-        FunctionCall that = (FunctionCall) o;
-        return Objects.equals(name, that.name) &&
-                Objects.equals(arguments, that.arguments);
+        WhenClause that = (WhenClause) o;
+        return Objects.equals(operand, that.operand) &&
+                Objects.equals(result, that.result);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, arguments);
+        return Objects.hash(operand, result);
     }
 }

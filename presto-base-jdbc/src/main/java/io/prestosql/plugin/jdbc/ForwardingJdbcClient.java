@@ -21,7 +21,7 @@ import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SystemTable;
-import io.prestosql.spi.expression.FunctionCall;
+import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.Type;
@@ -116,9 +116,9 @@ public abstract class ForwardingJdbcClient
     }
 
     @Override
-    public Optional<JdbcExpression> implementFunction(ConnectorSession session, FunctionCall functionCall, Map<String, ColumnHandle> assignments)
+    public Optional<JdbcExpression> handleConnectorExpression(ConnectorSession session, ConnectorExpression connectorExpression, Map<String, ColumnHandle> assignments)
     {
-        return delegate().implementFunction(session, functionCall, assignments);
+        return delegate().handleConnectorExpression(session, connectorExpression, assignments);
     }
 
     @Override

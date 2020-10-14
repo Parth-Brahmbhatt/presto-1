@@ -13,28 +13,18 @@
  */
 package io.prestosql.plugin.druid.function;
 
-import com.google.common.base.Joiner;
-import io.airlift.slice.Slice;
 import io.prestosql.matching.Capture;
-import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
-import io.prestosql.plugin.jdbc.JdbcExpression;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.plugin.jdbc.expression.FunctionRule;
 import io.prestosql.spi.expression.ConnectorExpression;
-import io.prestosql.spi.expression.Constant;
 import io.prestosql.spi.expression.FunctionCall;
-import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.VarcharType;
 
-import java.sql.JDBCType;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static io.prestosql.matching.Capture.newCapture;
-import static io.prestosql.plugin.jdbc.StandardColumnMappings.prestoTypeToJdbcType;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.basicFunction;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.functionName;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.outputType;
@@ -75,12 +65,6 @@ public class FunctionRuleDSL
     }
 
     @Override
-    public Optional<JdbcExpression> rewrite(FunctionCall function, Captures captures, RewriteContext context)
-    {
-        return processConnectorExpression(function, context, shouldQuoteStringLiterals);
-    }
-
-    @Override
     public String getPrestoName()
     {
         return prestoName;
@@ -102,78 +86,6 @@ public class FunctionRuleDSL
     public boolean shouldQuoteStringLiterals()
     {
         return shouldQuoteStringLiterals;
-    }
-
-    private Optional<JdbcExpression> processConnectorExpression(FunctionCall functionCall, RewriteContext context, boolean shouldQuoteStringLiterals)
-    {
-        final Optional<FunctionRule> rule = context.getRule(functionCall.getName());
-        if (rule.isPresent()) {
-            final Optional<String> expressionFormat = rule.get().expressionFormat();
-            final JdbcTypeHandle jdbcTypeHandle = rule.get().getJdbcTypeHandle();
-            String expression = expressionFormat.orElse(prestoName + "(%s)");
-            final List<String> arguments = functionCall.getArguments().stream()
-                    .map(arg -> processConnectorExpression(arg, context, rule.get().shouldQuoteStringLiterals()))
-                    .filter(Optional::isPresent)
-                    .map(arg -> arg.get().getExpression())
-                    .collect(Collectors.toList());
-
-            if (arguments.size() != functionCall.getArguments().size()) {
-                return Optional.empty();
-            }
-            expression = String.format(expression, Joiner.on(",").join(arguments));
-
-            return Optional.of(new JdbcExpression(expression, jdbcTypeHandle));
-        }
-        return Optional.empty();
-    }
-
-    private Optional<JdbcExpression> processConnectorExpression(ConnectorExpression connectorExpression, RewriteContext context, boolean shouldQuoteStringLiterals)
-    {
-        if (connectorExpression instanceof FunctionCall) {
-            return processConnectorExpression((FunctionCall) connectorExpression, context, shouldQuoteStringLiterals);
-        }
-        else if (connectorExpression instanceof Variable) {
-            return processConnectorExpression((Variable) connectorExpression, context, shouldQuoteStringLiterals);
-        }
-        else if (connectorExpression instanceof Constant) {
-            return processConnectorExpression((Constant) connectorExpression, context, shouldQuoteStringLiterals);
-        }
-        throw new UnsupportedOperationException("can't handle " + connectorExpression);
-    }
-
-    private Optional<JdbcExpression> processConnectorExpression(Constant constant, RewriteContext context, boolean shouldQuoteStringLiterals)
-    {
-        // TODO can not handle nulls as druid does not have a way to just select NULL
-        if (constant.getValue() == null) {
-            return Optional.empty();
-        }
-
-        String value;
-        int size = 0;
-        if (constant.getType() instanceof VarcharType) {
-            size = ((VarcharType) constant.getType()).getLength().orElse(VarcharType.UNBOUNDED_LENGTH);
-            if (shouldQuoteStringLiterals) {
-                value = String.format("'%s'", ((Slice) constant.getValue()).toStringUtf8());
-            }
-            else {
-                value = ((Slice) constant.getValue()).toStringUtf8();
-            }
-        }
-        else {
-            value = String.format("CAST(%s as %s)", constant.getValue(), JDBCType.valueOf(prestoTypeToJdbcType(constant.getType()).get()).getName());
-        }
-
-        return Optional.of(new JdbcExpression(
-                value,
-                new JdbcTypeHandle(prestoTypeToJdbcType(constant.getType()).get(), Optional.empty(), size, 0, Optional.empty(), Optional.empty())));
-    }
-
-    private Optional<JdbcExpression> processConnectorExpression(Variable variable, RewriteContext context, boolean shouldQuoteStringLiterals)
-    {
-        return Optional.of(new JdbcExpression(
-                context.getAssignments().get(variable.getName()).toSqlExpression(name -> context.getIdentifierQuote().apply(name)),
-                context.getAssignments().get(variable.getName()).getJdbcTypeHandle()
-        ));
     }
 
     public static Builder builder()
