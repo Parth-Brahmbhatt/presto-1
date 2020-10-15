@@ -335,6 +335,13 @@ public class JdbcMetadata
             resultAssignments.add(new Assignment(newColumn.getColumnName(), newColumn, aggregate.getOutputType()));
         }
 
+        if (aggregates == null || aggregates.size() == 0) {
+            groupingSets.stream()
+                    .flatMap(List::stream)
+                    .map(JdbcColumnHandle.class::cast)
+                    .forEach(newColumns::add);
+        }
+
         handle = new JdbcTableHandle(
                 handle.getSchemaTableName(),
                 handle.getRemoteTableName(),
