@@ -231,7 +231,7 @@ public final class ConnectorExpressionTranslator
             }
             final List<ConnectorExpression> arguments = functionCall.getArguments().stream()
                     .map(expression -> process(expression, context))
-                    .filter(Optional::isPresent)
+                    .filter(expr -> expr != null && expr.isPresent() && expr.get() != null)
                     .map(Optional::get)
                     .collect(Collectors.toList());
 
@@ -259,7 +259,7 @@ public final class ConnectorExpressionTranslator
 
             final List<io.prestosql.spi.expression.WhenClause> whenClauses = caseExpression.getWhenClauses().stream()
                     .map(clause -> process(clause, context))
-                    .filter(Optional::isPresent)
+                    .filter(expr -> expr != null && expr.isPresent() && expr.get() != null)
                     .map(e -> (io.prestosql.spi.expression.WhenClause) e.get())
                     .collect(Collectors.toList());
             if (whenClauses.size() != caseExpression.getWhenClauses().size()) {
@@ -305,7 +305,7 @@ public final class ConnectorExpressionTranslator
 
             final List<io.prestosql.spi.expression.WhenClause> whenClauses = caseExpression.getWhenClauses().stream()
                     .map(clause -> process(clause, context))
-                    .filter(Optional::isPresent)
+                    .filter(expr -> expr != null && expr.isPresent() && expr.get() != null)
                     .map(e -> (io.prestosql.spi.expression.WhenClause) e.get())
                     .collect(Collectors.toList());
             if (whenClauses.size() != caseExpression.getWhenClauses().size()) {
@@ -318,7 +318,7 @@ public final class ConnectorExpressionTranslator
         protected Optional<ConnectorExpression> visitDereferenceExpression(DereferenceExpression node, Void context)
         {
             Optional<ConnectorExpression> translatedBase = process(node.getBase());
-            if (translatedBase.isEmpty()) {
+            if (translatedBase == null || translatedBase.isEmpty()) {
                 return Optional.empty();
             }
 
@@ -379,7 +379,7 @@ public final class ConnectorExpressionTranslator
         {
             final List<ConnectorExpression> values = node.getValues().stream()
                     .map(value -> process(value, context))
-                    .filter(x -> x != null && x.isPresent())
+                    .filter(x -> x != null && x.isPresent() && x.get() != null)
                     .map(Optional::get)
                     .collect(Collectors.toList());
 
