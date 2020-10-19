@@ -65,6 +65,7 @@ import static io.prestosql.spi.type.StandardTypes.BOOLEAN;
 import static io.prestosql.spi.type.StandardTypes.INTEGER;
 import static io.prestosql.spi.type.StandardTypes.SMALLINT;
 import static io.prestosql.spi.type.StandardTypes.TINYINT;
+import static io.prestosql.sql.analyzer.TypeSignatureTranslator.toSqlType;
 import static java.util.Objects.requireNonNull;
 
 public final class ConnectorExpressionTranslator
@@ -109,6 +110,12 @@ public final class ConnectorExpressionTranslator
                 RowType type = (RowType) dereference.getTarget().getType();
                 String name = type.getFields().get(dereference.getField()).getName().get();
                 return new DereferenceExpression(translate(dereference.getTarget()), new Identifier(name));
+            }
+
+            if (expression instanceof io.prestosql.spi.expression.Cast) {
+                io.prestosql.spi.expression.Cast cast = (io.prestosql.spi.expression.Cast) expression;
+                final Expression castExpression = translate(cast.getExpression());
+                return new Cast(castExpression, toSqlType(cast.getType()), cast.isSafe(), cast.isTypeOnly());
             }
 
             throw new UnsupportedOperationException("Expression type not supported: " + expression.getClass().getName());

@@ -17,6 +17,7 @@ import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
+import io.prestosql.spi.type.AbstractVariableWidthType;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.CharType;
@@ -502,10 +503,14 @@ public final class StandardColumnMappings
             .put(BigintType.class, Types.BIGINT)
             .put(RealType.class, Types.DOUBLE)
             .build();
-
     public static Optional<Integer> prestoTypeToJdbcType(Type type)
     {
         // TODO bad assumption that if type is not in mapping it must be a null
-        return Optional.of(PRESTO_TO_JDBC.getOrDefault(type.getClass(), Types.NULL));
+        Integer jdbcType = PRESTO_TO_JDBC.getOrDefault(type.getClass(), Types.NULL);
+        if(jdbcType == Types.NULL && type instanceof AbstractVariableWidthType) {
+            // TODO handle the regexp case which has special non SPI types like JoniRegexpType
+            jdbcType = Types.VARCHAR;
+        }
+        return Optional.of(jdbcType);
     }
 }

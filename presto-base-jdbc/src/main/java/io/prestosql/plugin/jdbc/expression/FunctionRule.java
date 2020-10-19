@@ -18,6 +18,7 @@ import io.prestosql.plugin.jdbc.JdbcColumnHandle;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.expression.FunctionCall;
+import io.prestosql.spi.type.Type;
 
 import java.util.Map;
 import java.util.Optional;
@@ -31,7 +32,7 @@ public interface FunctionRule
 
     Optional<String> expressionFormat();
 
-    JdbcTypeHandle getJdbcTypeHandle();
+    JdbcTypeHandle getJdbcTypeHandle(Type sourceType);
 
     boolean shouldQuoteStringLiterals();
 

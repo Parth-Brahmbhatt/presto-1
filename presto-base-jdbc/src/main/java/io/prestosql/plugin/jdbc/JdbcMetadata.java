@@ -42,6 +42,7 @@ import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.expression.CaseExpression;
+import io.prestosql.spi.expression.Cast;
 import io.prestosql.spi.expression.ComparisonExpression;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.Constant;
@@ -185,7 +186,7 @@ public class JdbcMetadata
         ImmutableList.Builder<Assignment> resultAssignmentsBuilder = ImmutableList.builder();
         ImmutableList.Builder<ConnectorExpression> resultProjections = ImmutableList.builder();
         for (ConnectorExpression projection : projections) {
-            if (projection instanceof FunctionCall || projection instanceof ComparisonExpression || projection instanceof CaseExpression) {
+            if (projection instanceof FunctionCall || projection instanceof ComparisonExpression || projection instanceof CaseExpression || projection instanceof Cast) {
                 final Optional<JdbcExpression> jdbcExpression = jdbcClient.handleConnectorExpression(session, projection, assignments);
                 if (jdbcExpression.isPresent()) {
                     JdbcColumnHandle newColumn = JdbcColumnHandle.builder()

@@ -16,6 +16,7 @@ package io.prestosql.plugin.druid.function;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Pattern;
 import io.prestosql.plugin.jdbc.JdbcTypeHandle;
+import io.prestosql.plugin.jdbc.StandardColumnMappings;
 import io.prestosql.plugin.jdbc.expression.FunctionRule;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.FunctionCall;
@@ -27,7 +28,6 @@ import java.util.Optional;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.basicFunction;
 import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.functionName;
-import static io.prestosql.plugin.jdbc.expression.FunctionPatterns.outputType;
 import static java.util.Objects.requireNonNull;
 
 //TODO: match input types and sizes, the whole process connector expression needs to be visitor based not this if else shit.
@@ -38,21 +38,18 @@ public class FunctionRuleDSL
     private static final Capture<List<ConnectorExpression>> INPUT = newCapture();
     private final String prestoName; // presto aggregate function name to match
     private final Optional<String> expressionFormat; // the expression format
-    private final JdbcTypeHandle jdbcTypeHandle; // type handle if its different from input column
-    private Type outputType; // provide if the pattern should only match specific output type
+    private final Optional<JdbcTypeHandle> jdbcTypeHandle; // type handle if its different from input column
     private boolean shouldQuoteStringLiterals;
 
     public FunctionRuleDSL(
             String prestoName,
             Optional<String> expressionFormat,
-            JdbcTypeHandle jdbcTypeHandle,
-            Type outputType,
+            Optional<JdbcTypeHandle> jdbcTypeHandle,
             boolean shouldQuoteStringLiterals)
     {
         this.prestoName = requireNonNull(prestoName, "prestoName is null");
         this.expressionFormat = requireNonNull(expressionFormat, "expression is null");
         this.jdbcTypeHandle = requireNonNull(jdbcTypeHandle, "jdbcTypeHandle is null");
-        this.outputType = requireNonNull(outputType, "outputType is null");
         this.shouldQuoteStringLiterals = requireNonNull(shouldQuoteStringLiterals, "shouldQuoteStringLiterals is null");
     }
 
@@ -60,8 +57,7 @@ public class FunctionRuleDSL
     public Pattern<FunctionCall> getPattern()
     {
         return basicFunction()
-                .with(functionName().equalTo(prestoName))
-                .with(outputType().equalTo(outputType));
+                .with(functionName().equalTo(prestoName));
     }
 
     @Override
@@ -77,9 +73,13 @@ public class FunctionRuleDSL
     }
 
     @Override
-    public JdbcTypeHandle getJdbcTypeHandle()
+    public JdbcTypeHandle getJdbcTypeHandle(Type sourceType)
     {
-        return jdbcTypeHandle;
+        if (jdbcTypeHandle.isPresent()) {
+            return jdbcTypeHandle.get();
+        }
+        final Optional<Integer> jdbcType = StandardColumnMappings.prestoTypeToJdbcType(sourceType);
+        return new JdbcTypeHandle(jdbcType.get(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty());
     }
 
     @Override
@@ -97,8 +97,7 @@ public class FunctionRuleDSL
     {
         private String prestoName;
         private Optional<String> expression = Optional.empty();
-        private JdbcTypeHandle jdbcTypeHandle;
-        private Type outputType;
+        private Optional<JdbcTypeHandle> jdbcTypeHandle = Optional.empty();
         private boolean shouldQuoteStringLiterals = true;
 
         public Builder prestoName(String prestoName)
@@ -115,13 +114,7 @@ public class FunctionRuleDSL
 
         public Builder jdbcTypeHandle(JdbcTypeHandle jdbcTypeHandle)
         {
-            this.jdbcTypeHandle = jdbcTypeHandle;
-            return this;
-        }
-
-        public Builder outputType(Type outputType)
-        {
-            this.outputType = outputType;
+            this.jdbcTypeHandle = Optional.of(jdbcTypeHandle);
             return this;
         }
 
@@ -133,7 +126,7 @@ public class FunctionRuleDSL
 
         public FunctionRuleDSL build()
         {
-            return new FunctionRuleDSL(prestoName, expression, jdbcTypeHandle, outputType, shouldQuoteStringLiterals);
+            return new FunctionRuleDSL(prestoName, expression, jdbcTypeHandle, shouldQuoteStringLiterals);
         }
     }
 }
