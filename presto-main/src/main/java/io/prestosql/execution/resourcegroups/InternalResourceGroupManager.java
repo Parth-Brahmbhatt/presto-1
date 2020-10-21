@@ -64,7 +64,6 @@ import static io.airlift.units.Duration.nanosSince;
 import static io.prestosql.metadata.NodeState.ACTIVE;
 import static io.prestosql.spi.StandardErrorCode.QUERY_REJECTED;
 import static io.prestosql.spi.StandardErrorCode.SERVER_STARTING_UP;
-import static io.prestosql.util.PropertiesUtil.loadProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;

@@ -17,7 +17,6 @@ import io.airlift.units.DataSize;
 import io.prestosql.spi.PrestoException;
 
 import static io.prestosql.spi.StandardErrorCode.EXCEEDED_DATA_SIZE_LIMIT;
-import static io.prestosql.spi.StandardErrorCode.EXCEEDED_SCAN_LIMIT;
 
 public class ExceededDataSizeLimitException
         extends PrestoException

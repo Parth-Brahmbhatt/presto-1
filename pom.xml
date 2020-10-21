@@ -118,6 +118,7 @@
         <module>presto-ml</module>
         <module>presto-mongodb</module>
         <module>presto-mysql</module>
+        <module>presto-netflix</module>
         <module>presto-oracle</module>
         <module>presto-orc</module>
         <module>presto-parquet</module>
@@ -156,7 +157,6 @@
         <module>presto-tpcds</module>
         <module>presto-tpch</module>
         <module>presto-verifier</module>
-        <module>presto-netflix</module>
     </modules>
 
     <repositories>
@@ -1017,6 +1017,22 @@
             </dependency>
 
             <dependency>
+                <groupId>com.jayway.jsonpath</groupId>
+                <artifactId>json-path</artifactId>
+                <version>2.2.0</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>net.minidev</groupId>
+                        <artifactId>json-smart</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
                 <groupId>com.linkedin.calcite</groupId>
                 <artifactId>calcite-core</artifactId>
                 <version>1.21.0.140</version>
@@ -1254,6 +1270,13 @@
                 <groupId>net.sf.opencsv</groupId>
                 <artifactId>opencsv</artifactId>
                 <version>2.3</version>
+            </dependency>
+
+            <!-- NETFLIX ONLY DEPENDENCIES -->
+            <dependency>
+                <groupId>netflix</groupId>
+                <artifactId>brotli-codec</artifactId>
+                <version>0.1.8</version>
             </dependency>
 
             <dependency>

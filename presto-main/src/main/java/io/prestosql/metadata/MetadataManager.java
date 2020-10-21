@@ -21,11 +21,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import io.airlift.slice.Slice;
-import io.prestosql.FullConnectorSession;
 import io.prestosql.Session;
 import io.prestosql.connector.CatalogName;
-import io.prestosql.metadata.ResolvedFunction.ResolvedFunctionDecoder;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.metadata.ResolvedFunction.ResolvedFunctionDecoder;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.operator.window.WindowFunctionSupplier;
 import io.prestosql.security.AllowAllAccessControl;
@@ -108,9 +107,9 @@ import io.prestosql.sql.analyzer.Analyzer;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
-import io.prestosql.sql.planner.ConnectorExpressions;
 import io.prestosql.sql.parser.ParsingOptions;
 import io.prestosql.sql.parser.SqlParser;
+import io.prestosql.sql.planner.ConnectorExpressions;
 import io.prestosql.sql.planner.PartitioningHandle;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.transaction.TransactionManager;
@@ -146,7 +145,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.primitives.Primitives.wrap;
 import static io.prestosql.metadata.FunctionKind.AGGREGATE;
@@ -617,7 +615,7 @@ public final class MetadataManager
                 for (Entry<QualifiedObjectName, ConnectorViewDefinition> entry : getViews(session, prefix).entrySet()) {
                     ImmutableList.Builder<ColumnMetadata> columns = ImmutableList.builder();
                     ConnectorViewDefinition viewDefinition = entry.getValue();
-                    if(!viewDefinition.isPrestoView()) {
+                    if (!viewDefinition.isPrestoView()) {
                         viewDefinition = deserializeHiveView(session, viewDefinition);
                     }
 
@@ -1060,7 +1058,7 @@ public final class MetadataManager
                             entry.getKey().getSchemaName(),
                             entry.getKey().getTableName());
                     ConnectorViewDefinition viewDefinition = entry.getValue();
-                    views.put(viewName, viewDefinition.isPrestoView()? viewDefinition : deserializeHiveView(session, viewDefinition));
+                    views.put(viewName, viewDefinition.isPrestoView() ? viewDefinition : deserializeHiveView(session, viewDefinition));
                 }
             }
         }
@@ -1114,7 +1112,7 @@ public final class MetadataManager
             if (view.isEmpty()) {
                 return view;
             }
-            return view.get().isPrestoView()? view: Optional.of(deserializeHiveView(session, view.get()));
+            return view.get().isPrestoView() ? view : Optional.of(deserializeHiveView(session, view.get()));
         }
         return Optional.empty();
     }
@@ -2153,7 +2151,7 @@ public final class MetadataManager
         try {
             SqlParser sqlParser = new SqlParser();
             Analyzer analyzer = new Analyzer(session, this, sqlParser, new AllowAllAccessControl(), Optional.<QueryExplainer>empty(),
-                new ArrayList(), new HashMap<>(), WarningCollector.NOOP);
+                    new ArrayList(), new HashMap<>(), WarningCollector.NOOP);
             io.prestosql.sql.tree.Statement statement = sqlParser.createStatement(sql, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));
             io.prestosql.sql.analyzer.Analysis analysis = analyzer.analyze(statement);
             List<ConnectorViewDefinition.ViewColumn> columns = analysis.getOutputDescriptor()
