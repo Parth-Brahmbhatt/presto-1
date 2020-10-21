@@ -33,32 +33,6 @@
         <tag>350</tag>
     </scm>
 
-    <repositories>
-        <repository>
-            <id>nfrepo-everything-pom</id>
-            <name>Netflix Artifactory</name>
-            <url>http://artifacts.netflix.com/nfrepo-everything-pom</url>
-        </repository>
-        <repository>
-            <id>libs-releases-local</id>
-            <name>Netflix Artifactory</name>
-            <url>https://artifacts.netflix.com/libs-releases-local</url>
-        </repository>
-        <repository>
-            <id>libs-candidates-local-pom</id>
-            <name>Netflix Artifactory</name>
-            <url>http://artifacts.netflix.com/libs-candidates-local-pom</url>
-        </repository>
-
-        <repository>
-            <id>libs-candidates-local</id>
-            <name>Netflix Artifactory</name>
-            <url>http://artifacts.netflix.com/libs-candidates-local</url>
-        </repository>
-
-    </repositories>
-
-
     <properties>
         <air.main.basedir>${project.basedir}</air.main.basedir>
 
@@ -184,6 +158,31 @@
         <module>presto-tpch</module>
         <module>presto-verifier</module>
     </modules>
+
+    <repositories>
+        <repository>
+            <id>nfrepo-everything-pom</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/nfrepo-everything-pom</url>
+        </repository>
+        <repository>
+            <id>libs-releases-local</id>
+            <name>Netflix Artifactory</name>
+            <url>https://artifacts.netflix.com/libs-releases-local</url>
+        </repository>
+        <repository>
+            <id>libs-candidates-local-pom</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/libs-candidates-local-pom</url>
+        </repository>
+
+        <repository>
+            <id>libs-candidates-local</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/libs-candidates-local</url>
+        </repository>
+
+    </repositories>
 
     <repositories>
         <repository>

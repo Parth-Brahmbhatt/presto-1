@@ -13,7 +13,6 @@
  */
 package io.prestosql.server;
 
-import com.google.common.collect.Maps;
 import io.prestosql.failuredetector.HeartbeatFailureDetector;
 import io.prestosql.server.security.ResourceSecurity;
 
@@ -23,7 +22,6 @@ import javax.ws.rs.Path;
 
 import java.util.Collection;
 
-import static com.google.common.base.Predicates.in;
 import static io.prestosql.server.security.ResourceSecurity.AccessType.MANAGEMENT_READ;
 
 @Path("/v1/node")

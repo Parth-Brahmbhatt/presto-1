@@ -20,7 +20,6 @@ import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
 import io.prestosql.execution.ManagedQueryExecution;
 import io.prestosql.execution.QueryManagerConfig;
-import io.prestosql.execution.resourcegroups.InternalResourceGroup.RootInternalResourceGroup;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.server.ResourceGroupInfo;
@@ -244,7 +243,7 @@ public final class InternalResourceGroupManager<C>
         }
 
         if (!shouldQueueQueries()) {
-            for (RootInternalResourceGroup group : rootGroups) {
+            for (InternalResourceGroup group : rootGroups) {
                 try {
                     if (elapsedSeconds > 0) {
                         group.generateCpuQuota(elapsedSeconds);
@@ -254,7 +253,7 @@ public final class InternalResourceGroupManager<C>
                     log.error(e, "Exception while generation cpu quota for %s", group);
                 }
                 try {
-                    group.processQueuedQueries();
+                    group.updateGroupsAndProcessQueuedQueries();
                 }
                 catch (RuntimeException e) {
                     log.error(e, "Exception while processing queued queries for %s", group);
