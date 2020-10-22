@@ -86,7 +86,7 @@ public class BenchmarkResourceGroup
                 MockManagedQueryExecution query = new MockManagedQueryExecutionBuilder()
                         .withInitialMemoryUsage(DataSize.ofBytes(10))
                         .build();
-                group.run(query);
+                group.run(query, false);
             }
         }
 

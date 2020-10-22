@@ -15,7 +15,6 @@ package io.prestosql.plugin.hive;
 
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
-import com.facebook.presto.hive.PrestoHdfsCacheStats;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Provides;

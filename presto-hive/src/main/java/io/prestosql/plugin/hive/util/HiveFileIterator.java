@@ -13,7 +13,6 @@
  */
 package io.prestosql.plugin.hive.util;
 
-import com.facebook.presto.hive.PrestoHdfsCacheStats;
 import com.google.common.collect.AbstractIterator;
 import io.airlift.stats.TimeStat;
 import io.prestosql.plugin.hive.DirectoryLister;

@@ -38,6 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 public class PrestoHdfsCache
@@ -94,8 +95,9 @@ public class PrestoHdfsCache
     public Path getHdfsPathOrCopyToHdfs(Path s3path) throws IOException
     {
         if (cacheBasePath != null) {
-            String parentPath = s3path.getParent().toString();
-            String parentPathDigest = DigestUtils.md5Hex(parentPath.getBytes());
+            //@todo(vgankidi) Vinitha, the new checkstyle is forcing the use of charset name. Is UTF_8 the correct one to use?
+            byte[] parentPath = s3path.getParent().toString().getBytes(UTF_8);
+            String parentPathDigest = DigestUtils.md5Hex(parentPath);
             try {
                 Path hdfsPath = new Path(cacheBasePath, parentPathDigest + "/" + s3path.getName());
                 if (hadoopfs.exists(hdfsPath)) {
@@ -134,7 +136,8 @@ public class PrestoHdfsCache
 
     public void setDefaultFS()
     {
-        Configuration conf = new Configuration();
+        //@todo(vgankidi) Vinitha, the new checkstyle is forcing the use of a parameter .. 'false' is suggested. Does that look correct?
+        Configuration conf = new Configuration(false);
         String hadoopEnv = System.getenv("HADOOP_HOME");
         if (hadoopEnv != null) {
             log.info("Hadoop home: %s", hadoopEnv);
@@ -169,7 +172,8 @@ public class PrestoHdfsCache
 
     public void setHdfsCache(String defaultFS, int replication)
     {
-        Configuration hadoopConf = new Configuration();
+        //@todo(vgankidi) Vinitha, the new checkstyle is forcing the use of a parameter .. 'false' is suggested. Does that look correct?
+        Configuration hadoopConf = new Configuration(false);
         if (defaultFS == null) {
             setDefaultFS();
         }

@@ -65,7 +65,7 @@ public class QueryManagerConfig
     private Duration queryMaxExecutionTime = new Duration(100, TimeUnit.DAYS);
     private Duration queryMaxCpuTime = new Duration(1_000_000_000, TimeUnit.DAYS);
     private Optional<DataSize> queryMaxScanPhysicalBytes = Optional.empty();
-    private DataSize maxQueryDataSize = new DataSize(100, TERABYTE);
+    private DataSize maxQueryDataSize = io.airlift.units.DataSize.of(100, TERABYTE);
 
     private int requiredWorkers = 1;
     private Duration requiredWorkersMaxWait = new Duration(5, TimeUnit.MINUTES);

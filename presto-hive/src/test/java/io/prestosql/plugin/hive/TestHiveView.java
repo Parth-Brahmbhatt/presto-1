@@ -1,31 +1,21 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.prestosql.plugin.hive;
+
+//import io.prestosql.testing.AbstractTestQueryFramework;
+
 // @todo(anjali) This testcase needs to be reimplemented since the test infrastructure has changed quite a bit
-///*
-// * Licensed under the Apache License, Version 2.0 (the "License");
-// * you may not use this file except in compliance with the License.
-// * You may obtain a copy of the License at
-// *
-// *     http://www.apache.org/licenses/LICENSE-2.0
-// *
-// * Unless required by applicable law or agreed to in writing, software
-// * distributed under the License is distributed on an "AS IS" BASIS,
-// * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// * See the License for the specific language governing permissions and
-// * limitations under the License.
-// *//*
-// * Licensed under the Apache License, Version 2.0 (the "License");
-// * you may not use this file except in compliance with the License.
-// * You may obtain a copy of the License at
-// *
-// *     http://www.apache.org/licenses/LICENSE-2.0
-// *
-// * Unless required by applicable law or agreed to in writing, software
-// * distributed under the License is distributed on an "AS IS" BASIS,
-// * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// * See the License for the specific language governing permissions and
-// * limitations under the License.
-// */
-//package io.prestosql.plugin.hive;
-//
 //import com.google.common.collect.ImmutableList;
 //import com.google.common.collect.ImmutableMap;
 //import io.airlift.tpch.TpchTable;
@@ -53,9 +43,9 @@
 //import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
 //import static io.prestosql.tests.QueryAssertions.copyTpchTables;
 //
-//public class TestHiveView
+public class TestHiveView
 //    extends AbstractTestQueryFramework
-//{
+{
 //    private static final TestQueryRunnerUtil util = new TestQueryRunnerUtil();
 //
 //    public TestHiveView()
@@ -149,4 +139,4 @@
 //                ImmutableMap.of(), ImmutableMap.of());
 //        }
 //    }
-//}
+}

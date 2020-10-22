@@ -14,19 +14,18 @@
 package io.prestosql.tests;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.prestosql.Session;
 import io.prestosql.execution.QueryInfo;
 import io.prestosql.execution.QueryManager;
+import io.prestosql.spi.QueryId;
+import io.prestosql.spi.session.ResourceEstimates;
 import io.prestosql.testing.DistributedQueryRunner;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.ResultWithQueryId;
-import com.google.common.collect.ImmutableSet;
-import io.prestosql.Session;
-import io.prestosql.spi.QueryId;
-import io.prestosql.spi.session.ResourceEstimates;
 import io.prestosql.tests.tpch.TpchQueryRunnerBuilder;
 import org.testng.annotations.Test;
 
@@ -34,13 +33,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static io.prestosql.SystemSessionProperties.REQUIRED_WORKERS_COUNT;
+import static io.prestosql.SystemSessionProperties.REQUIRED_WORKERS_MAX_WAIT_TIME;
 import static io.prestosql.execution.QueryState.QUEUED;
 import static io.prestosql.execution.QueryState.RUNNING;
 import static io.prestosql.execution.TestQueryRunnerUtil.createQuery;
 import static io.prestosql.execution.TestQueryRunnerUtil.waitForQueryState;
-import static io.prestosql.testing.TestingSession.testSessionBuilder;
-import static io.prestosql.SystemSessionProperties.REQUIRED_WORKERS_COUNT;
-import static io.prestosql.SystemSessionProperties.REQUIRED_WORKERS_MAX_WAIT_TIME;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;

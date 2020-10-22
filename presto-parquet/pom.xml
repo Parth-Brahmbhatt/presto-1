@@ -68,13 +68,13 @@
         </dependency>
 
         <dependency>
-            <groupId>org.openjdk.jol</groupId>
-            <artifactId>jol-core</artifactId>
+            <groupId>netflix</groupId>
+            <artifactId>brotli-codec</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>netflix</groupId>
-            <artifactId>brotli-codec</artifactId>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
         </dependency>
 
         <!-- used by tests but also needed transitively -->

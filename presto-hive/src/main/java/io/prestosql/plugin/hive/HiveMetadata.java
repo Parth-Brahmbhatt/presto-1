@@ -1965,20 +1965,20 @@ public class HiveMetadata
                 ConnectorViewDefinition viewDefinition = "true".equals(tbl.getParameters().get(PRESTO_VIEW_FLAG)) ? decodeViewData(tbl.getViewOriginalText().get()) : null;
                 if (viewDefinition != null) {
                     views.put(schemaTableName, new ConnectorViewDefinition(
-                        viewDefinition.getOriginalSql(),
-                        viewDefinition.getCatalog(),
-                        viewDefinition.getSchema(),
-                        viewDefinition.getColumns(), //need view columns
-                        viewDefinition.getComment(),
-                        viewDefinition.getOwner(),
-                        viewDefinition.isRunAsInvoker()));
-                } else {
+                            viewDefinition.getOriginalSql(),
+                            viewDefinition.getCatalog(),
+                            viewDefinition.getSchema(),
+                            viewDefinition.getColumns(), //need view columns
+                            viewDefinition.getComment(),
+                            viewDefinition.getOwner(),
+                            viewDefinition.isRunAsInvoker()));
+                }
+                else {
                     views.put(schemaTableName, new ConnectorViewDefinition(
-                        tbl.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
-                        tbl.getViewExpandedText(),
-                        Optional.of(tbl.getSchemaTableName().getSchemaName()),
-                        Optional.of(tbl.getOwner().replaceAll("@.*", ""))
-                    ));
+                            tbl.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
+                            tbl.getViewExpandedText(),
+                            Optional.of(tbl.getSchemaTableName().getSchemaName()),
+                            Optional.of(tbl.getOwner().replaceAll("@.*", ""))));
                 }
             }
         }

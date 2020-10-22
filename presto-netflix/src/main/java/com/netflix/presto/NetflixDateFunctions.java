@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.operator.scalar.DateTimeFunctions.addFieldValueDate;
-import static io.prestosql.operator.scalar.DateTimeFunctions.addFieldValueTimestamp;
+import static io.prestosql.operator.scalar.timestamp.addFieldValueTimestamp;
 import static io.prestosql.operator.scalar.DateTimeFunctions.addFieldValueTimestampWithTimeZone;
 import static io.prestosql.operator.scalar.DateTimeFunctions.dayFromDate;
 import static io.prestosql.operator.scalar.DateTimeFunctions.dayFromTimestamp;

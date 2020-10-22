@@ -137,7 +137,7 @@ public class HiveSplitManager
                 hiveConfig.getMaxSplitsPerSecond(),
                 hiveConfig.getRecursiveDirWalkerEnabled(),
                 typeManager);
-                hiveConfig.getRecursiveDirWalkerEnabled();
+        hiveConfig.getRecursiveDirWalkerEnabled();
         this.prestoHdfsCache = new PrestoHdfsCache();
         this.isHdfsDeployed = hiveConfig.isHdfsCacheEnabled();
         if (isHdfsDeployed) {
