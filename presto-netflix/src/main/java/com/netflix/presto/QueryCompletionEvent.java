@@ -71,7 +71,6 @@ public class QueryCompletionEvent
 
     private final Long queuedTimeMs;
     private final Long analysisTimeMs;
-    private final Long distributedPlanningTimeMs;
     private final Long totalSplitWallTimeMs;
     private final Long totalSplitCpuTimeMs;
     private final Long totalBytes;
@@ -123,7 +122,6 @@ public class QueryCompletionEvent
         final Instant endTime = event.getEndTime();
         final java.time.Duration queuedTime = event.getStatistics().getQueuedTime();
         final java.time.Duration analysisTime = event.getStatistics().getAnalysisTime().orElse(null);
-        final java.time.Duration distributedPlanningTime = event.getStatistics().getDistributedPlanningTime().orElse(null);
         final java.time.Duration totalSplitWallTime = event.getStatistics().getWallTime();
         final java.time.Duration totalSplitCpuTime = event.getStatistics().getCpuTime();
         final long totalDataSize = event.getStatistics().getTotalBytes();
@@ -192,7 +190,6 @@ public class QueryCompletionEvent
                 endTime != null ? new DateTime(endTime.getEpochSecond() * 1000, DateTimeZone.UTC) : null,
                 queuedTime != null ? new Duration(queuedTime.toMillis(), TimeUnit.MILLISECONDS) : null,
                 analysisTime != null ? new Duration(analysisTime.toMillis(), TimeUnit.MILLISECONDS) : null,
-                distributedPlanningTime != null ? new Duration(distributedPlanningTime.toMillis(), TimeUnit.MILLISECONDS) : null,
                 totalSplitWallTime != null ? new Duration(totalSplitWallTime.toMillis(), TimeUnit.MILLISECONDS) : null,
                 totalSplitCpuTime != null ? new Duration(totalSplitCpuTime.toMillis(), TimeUnit.MILLISECONDS) : null,
                 new DataSize(totalDataSize, DataSize.Unit.BYTE),
@@ -240,7 +237,6 @@ public class QueryCompletionEvent
             DateTime endTime,
             Duration queuedTime,
             Duration analysisTime,
-            Duration distributedPlanningTime,
             Duration totalSplitWallTime,
             Duration totalSplitCpuTime,
             DataSize totalDataSize,
@@ -287,7 +283,6 @@ public class QueryCompletionEvent
         this.endTime = endTime;
         this.queuedTimeMs = durationToMillis(queuedTime);
         this.analysisTimeMs = durationToMillis(analysisTime);
-        this.distributedPlanningTimeMs = durationToMillis(distributedPlanningTime);
         this.totalSplitWallTimeMs = durationToMillis((totalSplitWallTime));
         this.totalSplitCpuTimeMs = durationToMillis(totalSplitCpuTime);
         this.totalBytes = sizeToBytes(totalDataSize);
@@ -488,12 +483,6 @@ public class QueryCompletionEvent
     public Long getAnalysisTimeMs()
     {
         return analysisTimeMs;
-    }
-
-    @EventField
-    public Long getDistributedPlanningTimeMs()
-    {
-        return distributedPlanningTimeMs;
     }
 
     @EventField
