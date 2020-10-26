@@ -87,6 +87,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 
 public final class MetastoreUtil
 {
+    private static final String HIVE_PARTITION_VALUE_WILDCARD = "";
     public static final String COLELCTION_DELIM = "colelction.delim";
 
     private MetastoreUtil()
