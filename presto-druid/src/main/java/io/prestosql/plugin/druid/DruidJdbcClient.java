@@ -44,6 +44,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.expression.ArithmaticBinaryExpression;
 import io.prestosql.spi.expression.CaseExpression;
 import io.prestosql.spi.expression.Cast;
 import io.prestosql.spi.expression.ComparisonExpression;
@@ -56,6 +57,7 @@ import io.prestosql.spi.expression.Operator;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.expression.WhenClause;
 import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
@@ -161,6 +163,9 @@ public class DruidJdbcClient
         }
         else if (connectorExpression instanceof InListExpression) {
             return processConnectorExpression((InListExpression) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof ArithmaticBinaryExpression) {
+            return processConnectorExpression((ArithmaticBinaryExpression) connectorExpression, context, shouldQuoteStringLiterals);
         }
         return Optional.empty();
     }
@@ -350,6 +355,22 @@ public class DruidJdbcClient
                 new JdbcTypeHandle(JDBCType.BOOLEAN.getVendorTypeNumber(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
     }
 
+    public Optional<JdbcExpression> processConnectorExpression(ArithmaticBinaryExpression arithmaticBinaryExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        final Optional<String> operator = processOperator(arithmaticBinaryExpression.getOperator());
+        final Optional<JdbcExpression> left = processConnectorExpression(arithmaticBinaryExpression.getLeft(), context, shouldQuoteStringLiterals);
+        final Optional<JdbcExpression> right = processConnectorExpression(arithmaticBinaryExpression.getRight(), context, shouldQuoteStringLiterals);
+
+        if (operator.isEmpty() || left == null || right == null || left.isEmpty() || right.isEmpty()) {
+            return Optional.empty();
+        }
+
+        final String jdbcExpression = String.format("%s %s %s", left.get().getExpression(), operator.get(), right.get().getExpression());
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(JDBCType.BOOLEAN.getVendorTypeNumber(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
     public Optional<String> processOperator(Operator operator)
     {
         switch (operator) {
@@ -368,6 +389,23 @@ public class DruidJdbcClient
             default:
                 return Optional.empty();
         }
+    }
+
+    public Optional<String> processOperator(ArithmaticBinaryExpression.Operator operator)
+    {
+        switch (operator) {
+            case ADD:
+                return Optional.of("+");
+            case SUBTRACT:
+                return Optional.of("-");
+            case MULTIPLY:
+                return Optional.of("*");
+            case DIVIDE:
+                return Optional.of("/");
+            case MODULUS:
+                return Optional.of("%");
+        }
+        return Optional.empty();
     }
 
     //Overridden to filter out tables that don't match schemaTableName
@@ -653,6 +691,7 @@ public class DruidJdbcClient
                                 .outputType(DOUBLE)
                                 .jdbcTypeHandle(doubleHandle)
                                 .build()));
+
         return builder.build();
     }
 
@@ -661,6 +700,7 @@ public class DruidJdbcClient
         JdbcTypeHandle bigIntHandle = new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), 0, 0, Optional.empty(), Optional.empty());
         JdbcTypeHandle doubleHandle = new JdbcTypeHandle(Types.DOUBLE, Optional.of("double"), 0, 0, Optional.empty(), Optional.empty());
         JdbcTypeHandle timestampHandle = new JdbcTypeHandle(Types.TIMESTAMP, Optional.of("timestamp"), 0, 0, Optional.empty(), Optional.empty());
+        JdbcTypeHandle timestampWithTimeZoneHandle = new JdbcTypeHandle(Types.TIMESTAMP_WITH_TIMEZONE, Optional.empty(), 0, 0, Optional.empty(), Optional.empty());
         JdbcTypeHandle varcharHandle = new JdbcTypeHandle(Types.VARCHAR, Optional.of("varchar"), -1, 0, Optional.empty(), Optional.empty());
         ImmutableSet.Builder<FunctionRule> builder = ImmutableSet.builder();
 
@@ -729,13 +769,12 @@ public class DruidJdbcClient
                 .expression("EXTRACT(SECOND from %s)")
                 .jdbcTypeHandle(bigIntHandle)
                 .build());
-// literal issue
-//        builder.add(FunctionRuleDSL.builder()
-//                .prestoName("parse_datetime")
-//                .expression("TIME_PARSE(%s)")
-//                .jdbcTypeHandle(timestampWithTimezoneHandle)
-//                .outputType(TimestampWithTimeZoneType.createTimestampWithTimeZoneType(3))
-//                .build());
+
+        builder.add(FunctionRuleDSL.builder()
+                .prestoName("parse_datetime")
+                .expression("cast(TIME_PARSE(%s)")
+                .jdbcTypeHandle(timestampWithTimeZoneHandle)
+                .build());
 
         builder.add(FunctionRuleDSL.builder()
                 .prestoName("format_datetime")

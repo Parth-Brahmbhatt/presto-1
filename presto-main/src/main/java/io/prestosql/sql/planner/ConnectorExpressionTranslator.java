@@ -14,6 +14,7 @@
 package io.prestosql.sql.planner;
 
 import io.prestosql.Session;
+import io.prestosql.spi.expression.ArithmaticBinaryExpression;
 import io.prestosql.spi.expression.CaseExpression;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.Constant;
@@ -25,6 +26,7 @@ import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.TypeSignatureTranslator;
+import io.prestosql.sql.tree.ArithmeticBinaryExpression;
 import io.prestosql.sql.tree.AstVisitor;
 import io.prestosql.sql.tree.BinaryLiteral;
 import io.prestosql.sql.tree.BooleanLiteral;
@@ -44,6 +46,7 @@ import io.prestosql.sql.tree.InPredicate;
 import io.prestosql.sql.tree.LongLiteral;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NullLiteral;
+import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SearchedCaseExpression;
 import io.prestosql.sql.tree.SimpleCaseExpression;
 import io.prestosql.sql.tree.StringLiteral;
@@ -66,6 +69,11 @@ import static io.prestosql.spi.type.StandardTypes.INTEGER;
 import static io.prestosql.spi.type.StandardTypes.SMALLINT;
 import static io.prestosql.spi.type.StandardTypes.TINYINT;
 import static io.prestosql.sql.analyzer.TypeSignatureTranslator.toSqlType;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.ADD;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.DIVIDE;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.MODULUS;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.MULTIPLY;
+import static io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator.SUBTRACT;
 import static java.util.Objects.requireNonNull;
 
 public final class ConnectorExpressionTranslator
@@ -118,7 +126,41 @@ public final class ConnectorExpressionTranslator
                 return new Cast(castExpression, toSqlType(cast.getType()), cast.isSafe(), cast.isTypeOnly());
             }
 
+            if (expression instanceof io.prestosql.spi.expression.FunctionCall) {
+                io.prestosql.spi.expression.FunctionCall functionCall = (io.prestosql.spi.expression.FunctionCall) expression;
+                final List<Expression> arguments = functionCall.getArguments().stream()
+                        .map(arg -> translate(arg))
+                        .collect(Collectors.toList());
+                return new FunctionCall(QualifiedName.of(functionCall.getName()), arguments);
+            }
+
+            if (expression instanceof io.prestosql.spi.expression.ArithmaticBinaryExpression) {
+                io.prestosql.spi.expression.ArithmaticBinaryExpression arithmaticBinaryExpression = (io.prestosql.spi.expression.ArithmaticBinaryExpression) expression;
+
+                final Expression left = translate(arithmaticBinaryExpression.getLeft());
+                final Expression right = translate(arithmaticBinaryExpression.getRight());
+                final ArithmeticBinaryExpression.Operator operator = operator(arithmaticBinaryExpression.getOperator());
+                return new ArithmeticBinaryExpression(operator, left, right);
+            }
+
             throw new UnsupportedOperationException("Expression type not supported: " + expression.getClass().getName());
+        }
+
+        public ArithmeticBinaryExpression.Operator operator(io.prestosql.spi.expression.ArithmaticBinaryExpression.Operator operator)
+        {
+            switch (operator) {
+                case ADD:
+                    return ADD;
+                case SUBTRACT:
+                    return SUBTRACT;
+                case MULTIPLY:
+                    return MULTIPLY;
+                case DIVIDE:
+                    return DIVIDE;
+                case MODULUS:
+                    return MODULUS;
+            }
+            return null;
         }
     }
 
@@ -397,6 +439,18 @@ public final class ConnectorExpressionTranslator
             return Optional.of(new io.prestosql.spi.expression.InListExpression(values));
         }
 
+        @Override
+        protected Optional<ConnectorExpression> visitArithmeticBinary(ArithmeticBinaryExpression node, Void context)
+        {
+            final ArithmaticBinaryExpression.Operator operator = operator(node.getOperator());
+            final Optional<ConnectorExpression> left = process(node.getLeft(), context);
+            final Optional<ConnectorExpression> right = process(node.getRight(), context);
+            if (operator == null || left == null || right == null || left.isEmpty() || right.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(new ArithmaticBinaryExpression(operator, left.get(), right.get()));
+        }
+
         private Type typeOf(Expression node)
         {
             return types.get(NodeRef.of(node));
@@ -419,6 +473,23 @@ public final class ConnectorExpressionTranslator
                     return Operator.GREATER_THAN_OR_EQUAL;
                 case IS_DISTINCT_FROM:
                     return Operator.IS_DISTINCT_FROM;
+            }
+            return null;
+        }
+
+        private ArithmaticBinaryExpression.Operator operator(io.prestosql.sql.tree.ArithmeticBinaryExpression.Operator operator)
+        {
+            switch (operator) {
+                case ADD:
+                    return ArithmaticBinaryExpression.Operator.ADD;
+                case SUBTRACT:
+                    return ArithmaticBinaryExpression.Operator.SUBTRACT;
+                case MULTIPLY:
+                    return ArithmaticBinaryExpression.Operator.MULTIPLY;
+                case DIVIDE:
+                    return ArithmaticBinaryExpression.Operator.DIVIDE;
+                case MODULUS:
+                    return ArithmaticBinaryExpression.Operator.MODULUS;
             }
             return null;
         }

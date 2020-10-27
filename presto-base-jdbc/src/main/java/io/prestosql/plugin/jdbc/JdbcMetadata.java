@@ -200,6 +200,8 @@ public class JdbcMetadata
 
                     resultProjections.add(new Variable(newColumn.getColumnName(), projection.getType()));
                     resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, projection.getType()));
+                } else {
+                    return Optional.empty(); // if we can't handle even 1 function the pushdown is not happening so just return.
                 }
             }
             else if (projection instanceof Constant) {

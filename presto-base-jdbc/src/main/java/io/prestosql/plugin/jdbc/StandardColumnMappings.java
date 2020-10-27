@@ -21,6 +21,7 @@ import io.prestosql.spi.type.AbstractVariableWidthType;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.CharType;
+import io.prestosql.spi.type.DateTimeEncoding;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
@@ -28,6 +29,7 @@ import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.RealType;
 import io.prestosql.spi.type.TimeType;
+import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
@@ -382,9 +384,22 @@ public final class StandardColumnMappings
                 timestampWriteFunction());
     }
 
+    public static ColumnMapping timestampWithTimeZoneColumnMapping()
+    {
+        return ColumnMapping.longMapping(
+                TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE,
+                timestampWithTimeZoneReadFunction(),
+                timestampWriteFunction()); // TODO needs to be fixed but we don't write to druid so ignoring for POC
+    }
+
     public static LongReadFunction timestampReadFunction()
     {
         return (resultSet, columnIndex) -> toPrestoTimestamp(resultSet.getObject(columnIndex, LocalDateTime.class));
+    }
+
+    public static LongReadFunction timestampWithTimeZoneReadFunction()
+    {
+        return (resultSet, columnIndex) -> toPrestoTimestampWithTimeZone(resultSet.getTimestamp(columnIndex).toLocalDateTime());
     }
 
     /**
@@ -407,6 +422,11 @@ public final class StandardColumnMappings
     public static long toPrestoTimestamp(LocalDateTime localDateTime)
     {
         return localDateTime.atZone(UTC).toInstant().toEpochMilli();
+    }
+
+    public static long toPrestoTimestampWithTimeZone(LocalDateTime localDateTime)
+    {
+        return DateTimeEncoding.packDateTimeWithZone(localDateTime.atZone(UTC).toInstant().toEpochMilli(), TimeZoneKey.UTC_KEY);
     }
 
     public static LocalDateTime fromPrestoTimestamp(long value)
@@ -486,6 +506,10 @@ public final class StandardColumnMappings
             case Types.TIMESTAMP:
                 // TODO default to `timestampColumnMapping`
                 return Optional.of(timestampColumnMappingUsingSqlTimestamp());
+            case Types.TIMESTAMP_WITH_TIMEZONE:
+                return Optional.of(timestampWithTimeZoneColumnMapping());
+            case Types.OTHER:
+                return Optional.of(doubleColumnMapping());
         }
         return Optional.empty();
     }
