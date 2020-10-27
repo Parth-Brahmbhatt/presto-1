@@ -680,7 +680,7 @@ public class PrestoS3FileSystem
 
     @Nullable
     private ObjectListing handleS3Exception(RuntimeException e, Path path)
-        throws UnrecoverableS3OperationException
+            throws UnrecoverableS3OperationException
     {
         if (e instanceof AmazonS3Exception) {
             switch (((AmazonS3Exception) e).getStatusCode()) {

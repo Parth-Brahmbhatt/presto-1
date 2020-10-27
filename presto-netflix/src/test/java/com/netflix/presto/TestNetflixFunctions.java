@@ -27,8 +27,8 @@ import static com.netflix.presto.NetflixFunctions.nfExtractJson;
 import static com.netflix.presto.NetflixFunctions.nfExtractJsonScalar;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.slice.Slices.wrappedBuffer;
-import static io.prestosql.metadata.FunctionExtractor.extractFunctions;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 
 public class TestNetflixFunctions
@@ -75,14 +75,14 @@ public class TestNetflixFunctions
         assertFunction("JSON_EXTRACT_MULTIPLE('{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}', '[\"x\", \"y\"]')", VARCHAR, "{\"x\":\"x_val\",\"y\":\"y_val\"}");
         assertFunction("JSON_EXTRACT_MULTIPLE('{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}', '[\"y\"]')", VARCHAR, "{\"y\":\"y_val\"}");
         assertFunction("JSON_EXTRACT_MULTIPLE('{\"a\":1, \"b\": {\"a\" : 2}}', '[\"a\"]')", VARCHAR, "{\"a\":1}");
-        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}".getBytes()), wrappedBuffer("[\"DOESNTEXIST\"]".getBytes())), null);
-        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("\"\"".getBytes()), wrappedBuffer("[\"a\"]".getBytes())), null);
+        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("{\"x\":\"x_val\", \"y\":\"y_val\", \"z\":\"z_val\"}".getBytes(UTF_8)), wrappedBuffer("[\"DOESNTEXIST\"]".getBytes(UTF_8))), null);
+        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("\"\"".getBytes(UTF_8)), wrappedBuffer("[\"a\"]".getBytes(UTF_8))), null);
     }
 
     @Test(expectedExceptions = NullPointerException.class)
     public void testInvalidJsonExtractMultipleKeys()
     {
-        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("".getBytes()), null), null);
+        assertEquals(NetflixFunctions.jsonExtractMultiple(wrappedBuffer("".getBytes(UTF_8)), null), null);
     }
 
     @Test

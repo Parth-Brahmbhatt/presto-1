@@ -50,6 +50,7 @@ public class NodeResource
         return failureDetector.getStatsWithFilters(true, false);
     }
 
+    @ResourceSecurity(MANAGEMENT_READ)
     @GET
     @Path("active")
     public Collection<HeartbeatFailureDetector.Stats> getActive()
@@ -57,6 +58,7 @@ public class NodeResource
         return failureDetector.getStatsWithFilters(false, false);
     }
 
+    @ResourceSecurity(MANAGEMENT_READ)
     @GET
     @Path("decommissioned")
     public Collection<HeartbeatFailureDetector.Stats> getDecommissioned()

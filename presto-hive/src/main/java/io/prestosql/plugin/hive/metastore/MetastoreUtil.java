@@ -43,9 +43,9 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
-import org.apache.hadoop.hive.serde.serdeConstants;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;

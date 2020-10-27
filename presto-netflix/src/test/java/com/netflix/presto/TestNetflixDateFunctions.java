@@ -13,7 +13,7 @@
  */
 package com.netflix.presto;
 
-import io.prestosql.operator.scalar.AbstractTestFunctions;
+// import io.prestosql.operator.scalar.AbstractTestFunctions;
 
 //import io.prestosql.Session;
 //import io.prestosql.operator.scalar.AbstractTestFunctions;
@@ -46,7 +46,6 @@ import io.prestosql.operator.scalar.AbstractTestFunctions;
 //import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 //import static io.prestosql.testing.TestingSession.testSessionBuilder;
 //import static io.prestosql.util.DateTimeZoneIndex.getDateTimeZone;
-//import static java.lang.Math.toIntExact;
 //import static org.joda.time.Days.daysBetween;
 //import static org.joda.time.Hours.hoursBetween;
 //import static org.joda.time.Months.monthsBetween;
@@ -54,7 +53,7 @@ import io.prestosql.operator.scalar.AbstractTestFunctions;
 //import static org.joda.time.Weeks.weeksBetween;
 //
 public class TestNetflixDateFunctions
-        extends AbstractTestFunctions
+//        extends AbstractTestFunctions
 {
 //    private static final TimeZoneKey TIME_ZONE_KEY = getTimeZoneKey("America/Los_Angeles");
 //    private static final Integer DATEINT = 20180531;

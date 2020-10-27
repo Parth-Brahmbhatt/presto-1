@@ -314,7 +314,7 @@ public class TestPrestoS3FileSystem
             int maxRetries = 2;
             MockAmazonS3 s3 = new MockAmazonS3();
             s3.setListObjectHttpCode(HTTP_INTERNAL_ERROR);
-            Configuration configuration = new Configuration();
+            Configuration configuration = new Configuration(false);
             configuration.set(S3_MAX_BACKOFF_TIME, "1ms");
             configuration.set(S3_MAX_RETRY_TIME, "5s");
             configuration.setInt(S3_MAX_CLIENT_RETRIES, maxRetries);
