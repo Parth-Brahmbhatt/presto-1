@@ -43,6 +43,7 @@ import io.prestosql.spi.connector.SystemTable;
 import io.prestosql.spi.connector.TableNotFoundException;
 import io.prestosql.spi.expression.CaseExpression;
 import io.prestosql.spi.expression.Cast;
+import io.prestosql.spi.expression.CoalesceExpression;
 import io.prestosql.spi.expression.ComparisonExpression;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.Constant;
@@ -186,7 +187,7 @@ public class JdbcMetadata
         ImmutableList.Builder<Assignment> resultAssignmentsBuilder = ImmutableList.builder();
         ImmutableList.Builder<ConnectorExpression> resultProjections = ImmutableList.builder();
         for (ConnectorExpression projection : projections) {
-            if (projection instanceof FunctionCall || projection instanceof ComparisonExpression || projection instanceof CaseExpression || projection instanceof Cast) {
+            if (projection instanceof FunctionCall || projection instanceof ComparisonExpression || projection instanceof CaseExpression || projection instanceof Cast || projection instanceof CoalesceExpression) {
                 final Optional<JdbcExpression> jdbcExpression = jdbcClient.handleConnectorExpression(session, projection, assignments);
                 if (jdbcExpression.isPresent()) {
                     JdbcColumnHandle newColumn = JdbcColumnHandle.builder()
@@ -200,7 +201,8 @@ public class JdbcMetadata
 
                     resultProjections.add(new Variable(newColumn.getColumnName(), projection.getType()));
                     resultAssignmentsBuilder.add(new Assignment(newColumn.getColumnName(), newColumn, projection.getType()));
-                } else {
+                }
+                else {
                     return Optional.empty(); // if we can't handle even 1 function the pushdown is not happening so just return.
                 }
             }

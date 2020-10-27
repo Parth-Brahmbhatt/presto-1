@@ -47,6 +47,7 @@ import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.expression.ArithmaticBinaryExpression;
 import io.prestosql.spi.expression.CaseExpression;
 import io.prestosql.spi.expression.Cast;
+import io.prestosql.spi.expression.CoalesceExpression;
 import io.prestosql.spi.expression.ComparisonExpression;
 import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.expression.Constant;
@@ -57,7 +58,6 @@ import io.prestosql.spi.expression.Operator;
 import io.prestosql.spi.expression.Variable;
 import io.prestosql.spi.expression.WhenClause;
 import io.prestosql.spi.type.TimestampType;
-import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
@@ -166,6 +166,9 @@ public class DruidJdbcClient
         }
         else if (connectorExpression instanceof ArithmaticBinaryExpression) {
             return processConnectorExpression((ArithmaticBinaryExpression) connectorExpression, context, shouldQuoteStringLiterals);
+        }
+        else if (connectorExpression instanceof CoalesceExpression) {
+            return processConnectorExpression((CoalesceExpression) connectorExpression, context, shouldQuoteStringLiterals);
         }
         return Optional.empty();
     }
@@ -369,6 +372,36 @@ public class DruidJdbcClient
         return Optional.of(new JdbcExpression(
                 jdbcExpression,
                 new JdbcTypeHandle(JDBCType.BOOLEAN.getVendorTypeNumber(), Optional.empty(), 0, 0, Optional.empty(), Optional.empty())));
+    }
+
+    public Optional<JdbcExpression> processConnectorExpression(CoalesceExpression coalesceExpression, FunctionRule.RewriteContext context, boolean shouldQuoteStringLiterals)
+    {
+        List<JdbcExpression> connectorExpressions = coalesceExpression.getConnectorExpressions().stream()
+                .map(expr -> processConnectorExpression(expr, context, shouldQuoteStringLiterals))
+                .filter(expr -> expr != null && expr.isPresent())
+                .map(Optional::get)
+                .collect(Collectors.toList());
+
+        if (connectorExpressions == null || connectorExpressions.size() != coalesceExpression.getConnectorExpressions().size()) {
+            return Optional.empty();
+        }
+
+        final String coaleceList = connectorExpressions.stream()
+                .map(expr -> expr.getExpression())
+                .collect(Collectors.joining(","));
+
+        final String jdbcExpression = String.format("COALESCE(%s)", coaleceList);
+        final Optional<Integer> jdbcType = prestoTypeToJdbcType(coalesceExpression.getType());
+        if (jdbcType.isEmpty()) {
+            return Optional.empty();
+        }
+        int size = 0;
+        if (coalesceExpression.getType() instanceof VarcharType) {
+            size = ((VarcharType) coalesceExpression.getType()).getLength().orElse(VarcharType.UNBOUNDED_LENGTH);
+        }
+        return Optional.of(new JdbcExpression(
+                jdbcExpression,
+                new JdbcTypeHandle(jdbcType.get(), Optional.empty(), size, 0, Optional.empty(), Optional.empty())));
     }
 
     public Optional<String> processOperator(Operator operator)

@@ -527,11 +527,12 @@ public final class StandardColumnMappings
             .put(BigintType.class, Types.BIGINT)
             .put(RealType.class, Types.DOUBLE)
             .build();
+
     public static Optional<Integer> prestoTypeToJdbcType(Type type)
     {
         // TODO bad assumption that if type is not in mapping it must be a null
         Integer jdbcType = PRESTO_TO_JDBC.getOrDefault(type.getClass(), Types.NULL);
-        if(jdbcType == Types.NULL && type instanceof AbstractVariableWidthType) {
+        if (jdbcType == Types.NULL && type instanceof AbstractVariableWidthType) {
             // TODO handle the regexp case which has special non SPI types like JoniRegexpType
             jdbcType = Types.VARCHAR;
         }

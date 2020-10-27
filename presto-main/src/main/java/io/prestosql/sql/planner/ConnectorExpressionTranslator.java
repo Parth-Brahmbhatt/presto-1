@@ -32,6 +32,7 @@ import io.prestosql.sql.tree.BinaryLiteral;
 import io.prestosql.sql.tree.BooleanLiteral;
 import io.prestosql.sql.tree.Cast;
 import io.prestosql.sql.tree.CharLiteral;
+import io.prestosql.sql.tree.CoalesceExpression;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.DataType;
 import io.prestosql.sql.tree.DecimalLiteral;
@@ -204,6 +205,22 @@ public final class ConnectorExpressionTranslator
         protected Optional<ConnectorExpression> visitDecimalLiteral(DecimalLiteral node, Void context)
         {
             return Optional.of(new Constant(Decimals.parse(node.getValue()).getObject(), typeOf(node)));
+        }
+
+        @Override
+        protected Optional<ConnectorExpression> visitCoalesceExpression(CoalesceExpression node, Void context)
+        {
+            final Type type = typeOf(node);
+            final List<Optional<ConnectorExpression>> operands = node.getOperands().stream()
+                    .map(this::process)
+                    .collect(Collectors.toList());
+            if (operands == null || operands.size() != node.getOperands().size() || operands.stream().anyMatch(x -> x == null || x.isEmpty())) {
+                return Optional.empty();
+            }
+            else {
+                final List<ConnectorExpression> operandList = operands.stream().map(Optional::get).collect(Collectors.toList());
+                return Optional.of(new io.prestosql.spi.expression.CoalesceExpression(type, operandList));
+            }
         }
 
         @Override
