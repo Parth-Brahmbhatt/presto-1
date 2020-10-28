@@ -805,7 +805,7 @@ public class DruidJdbcClient
 
         builder.add(FunctionRuleDSL.builder()
                 .prestoName("parse_datetime")
-                .expression("cast(TIME_PARSE(%s)")
+                .expression("TIME_PARSE(%s)")
                 .jdbcTypeHandle(timestampWithTimeZoneHandle)
                 .build());
 
