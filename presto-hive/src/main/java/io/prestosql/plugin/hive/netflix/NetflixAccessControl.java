@@ -83,11 +83,10 @@ public class NetflixAccessControl
         return schemaNames;
     }
 
-// @todo(anjali) This function does not exist in parent class
-//    @Override
-//    public void checkCanShowTablesMetadata(ConnectorSecurityContext context, String schemaName)
-//    {
-//    }
+    @Override
+    public void checkCanShowTables(ConnectorSecurityContext context, String schemaName)
+    {
+    }
 
     @Override
     public Set<SchemaTableName> filterTables(ConnectorSecurityContext context, Set<SchemaTableName> tableNames)
@@ -188,7 +187,8 @@ public class NetflixAccessControl
         checkAccess(context.getIdentity(), tableName);
     }
 
-    public void checkCanShowColumnsMetadata(ConnectorSecurityContext context, SchemaTableName tableName)
+    @Override
+    public void checkCanShowColumns(ConnectorSecurityContext context, SchemaTableName tableName)
     {
         checkAccess(context.getIdentity(), tableName);
     }

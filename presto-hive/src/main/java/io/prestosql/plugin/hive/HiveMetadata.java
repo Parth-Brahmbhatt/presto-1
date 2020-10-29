@@ -1943,11 +1943,14 @@ public class HiveMetadata
                     if (translateHiveViews && isHiveOrPrestoView(view)) {
                         return Optional.of(buildHiveViewConnectorDefinition(catalogName, view));
                     }
-                    return Optional.of(new ConnectorViewDefinition(
-                        view.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
-                        view.getViewExpandedText(),
-                        Optional.of(viewName.getSchemaName()),
-                        Optional.of(view.getOwner().replaceAll("@.*", ""))));
+                    if (isPrestoView(view)) {
+                        return Optional.of(new ConnectorViewDefinition(
+                            view.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
+                            view.getViewExpandedText(),
+                            Optional.of(viewName.getSchemaName()),
+                            Optional.of(view.getOwner().replaceAll("@.*", ""))));
+                    }
+                    return Optional.empty();
                 });
     }
 

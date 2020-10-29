@@ -94,7 +94,7 @@ public final class ScalarFromAnnotationsParser
             }
         }
         List<ScalarHeaderAndMethods> methods = builder.build();
-        checkArgument(!methods.isEmpty(), "Class [%s] does not have any methods annotated with @ScalarFunction or @ScalarOperator", annotated.getName());
+        // checkArgument(!methods.isEmpty(), "Class [%s] does not have any methods annotated with @ScalarFunction or @ScalarOperator", annotated.getName()); anjali comment out for now
         return methods;
     }
 

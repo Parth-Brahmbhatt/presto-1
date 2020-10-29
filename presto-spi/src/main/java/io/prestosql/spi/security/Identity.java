@@ -92,12 +92,16 @@ public class Identity
 
     public ConnectorIdentity toConnectorIdentity(String catalog)
     {
+        Map<String, String> sessionProperties = new HashMap<>();
+        if (sessionPropertiesByCatalog.get(catalog) != null) {
+            sessionProperties.putAll(sessionPropertiesByCatalog.get(catalog));
+        }
         return ConnectorIdentity.forUser(user)
                 .withGroups(groups)
                 .withPrincipal(principal)
                 .withRole(Optional.ofNullable(roles.get(catalog)))
                 .withExtraCredentials(extraCredentials)
-                .withSessionProperties(sessionPropertiesByCatalog.get(catalog))
+                .withSessionProperties(sessionProperties)
                 .build();
     }
 

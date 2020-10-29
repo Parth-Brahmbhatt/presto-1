@@ -303,6 +303,8 @@ public class PluginManager
             log.debug("    %s", file);
             urls.add(file.toURI().toURL());
         }
+        // @todo(anjali)
+        urls.add(new File("/Users/anorwood/.m2/repository/netflix/bdp-emr-credentials/1.5.0/bdp-emr-credentials-1.5.0.jar").toURI().toURL());
         return createClassLoader(urls);
     }
 
