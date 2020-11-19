@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
@@ -110,18 +111,24 @@ public final class NetflixDateFunctions
         return Instant.ofEpochMilli(epochMs).atZone(ZoneId.of(timeZoneKey.getId())).toLocalDate();
     }
 
-    private static LocalDate toLocalDate(Slice dateStr, Slice format)
+    private static LocalDate toLocalDate(ConnectorSession session, Slice dateStr, Slice format)
     {
-        java.time.format.DateTimeFormatter dateTimeFormatter =
-                java.time.format.DateTimeFormatter.ofPattern(format.toStringUtf8());
-        return LocalDate.parse(dateStr.toStringUtf8(), dateTimeFormatter);
+        DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(format.toStringUtf8())
+                .withChronology(getChronology(session.getTimeZoneKey()))
+                .withOffsetParsed()
+                .withLocale(session.getLocale());
+        org.joda.time.LocalDate localDate = dateTimeFormatter.parseDateTime(dateStr.toStringUtf8()).toLocalDate();
+        return LocalDate.of(localDate.getYear(), localDate.getMonthOfYear(), localDate.getDayOfMonth());
     }
 
-    private static LocalDateTime toLocalDateTime(Slice dateStr, Slice format)
+    private static LocalDateTime toLocalDateTime(ConnectorSession session, Slice dateStr, Slice format)
     {
-        java.time.format.DateTimeFormatter dateTimeFormatter =
-                java.time.format.DateTimeFormatter.ofPattern(format.toStringUtf8());
-        return LocalDateTime.parse(dateStr.toStringUtf8(), dateTimeFormatter);
+        DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(format.toStringUtf8())
+                .withChronology(getChronology(session.getTimeZoneKey()))
+                .withOffsetParsed()
+                .withLocale(session.getLocale());
+        org.joda.time.DateTime dateTime = dateTimeFormatter.parseDateTime(dateStr.toStringUtf8());
+        return LocalDateTime.of(dateTime.getYear(), Month.of(dateTime.getMonthOfYear()), dateTime.getDayOfMonth(), dateTime.getHourOfDay(), dateTime.getMinuteOfHour(), dateTime.getSecondOfMinute(), dateTime.getMillisOfSecond() * 1000000);
     }
 
     private static boolean isInvalidDate(int year, int month, int day)
@@ -361,7 +368,7 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             if (dateString.length() == 8) {
-                return toDateInt(toLocalDate(dateString, DATE_INT_FORMAT));
+                return toDateInt(toLocalDate(session, dateString, DATE_INT_FORMAT));
             }
             else if (dateString.length() == 10) {
                 return toDateInt(LocalDate.parse(dateString.toStringUtf8()));
@@ -377,10 +384,10 @@ public final class NetflixDateFunctions
     @Description("Convert a date string in a given format to dateint")
     @SqlType(INTEGER)
     @SqlNullable
-    public static Long nfDateInt(@SqlType(VARCHAR) Slice dateString, @SqlType(VARCHAR) Slice format)
+    public static Long nfDateInt(ConnectorSession session, @SqlType(VARCHAR) Slice dateString, @SqlType(VARCHAR) Slice format)
     {
         return handleExceptions(() -> {
-            return toDateInt(toLocalDate(dateString, format));
+            return toDateInt(toLocalDate(session, dateString, format));
         }, null);
     }
 
@@ -477,7 +484,7 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             if (dateString.length() == 8) {
-                return toUnixTime(toLocalDate(dateString, DATE_INT_FORMAT), session.getTimeZoneKey());
+                return toUnixTime(toLocalDate(session, dateString, DATE_INT_FORMAT), session.getTimeZoneKey());
             }
             else if (dateString.length() == 10) {
                 return toUnixTime(LocalDate.parse(dateString.toStringUtf8()), session.getTimeZoneKey());
@@ -496,11 +503,11 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             try {
-                return toUnixTimeMs(toLocalDateTime(dateString, format), session.getTimeZoneKey()) / 1000L;
+                return toUnixTimeMs(toLocalDateTime(session, dateString, format), session.getTimeZoneKey()) / 1000L;
             }
             catch (Exception e) {
                 if (e instanceof DateTimeParseException) {
-                    return toUnixTime(toLocalDate(dateString, format), session.getTimeZoneKey());
+                    return toUnixTime(toLocalDate(session, dateString, format), session.getTimeZoneKey());
                 }
                 else {
                     throw e;
@@ -563,7 +570,7 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             if (dateString.length() == 8) {
-                return toUnixTime(toLocalDate(dateString, DATE_INT_FORMAT), session.getTimeZoneKey()) * 1000L;
+                return toUnixTime(toLocalDate(session, dateString, DATE_INT_FORMAT), session.getTimeZoneKey()) * 1000L;
             }
             else if (dateString.length() == 10) {
                 return toUnixTime(LocalDate.parse(dateString.toStringUtf8()), session.getTimeZoneKey()) * 1000L;
@@ -582,11 +589,11 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             try {
-                return toUnixTimeMs(toLocalDateTime(dateString, format), session.getTimeZoneKey());
+                return toUnixTimeMs(toLocalDateTime(session, dateString, format), session.getTimeZoneKey());
             }
             catch (Exception e) {
                 if (e instanceof DateTimeParseException) {
-                    return toUnixTime(toLocalDate(dateString, format), session.getTimeZoneKey()) * 1000L;
+                    return toUnixTime(toLocalDate(session, dateString, format), session.getTimeZoneKey()) * 1000L;
                 }
                 else {
                     throw e;
@@ -778,7 +785,7 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             if (dateString.length() == 8) {
-                return utf8Slice(toLocalDate(dateString, DATE_INT_FORMAT).toString());
+                return utf8Slice(toLocalDate(session, dateString, DATE_INT_FORMAT).toString());
             }
             else if (dateString.length() == 10) {
                 LocalDate.parse(dateString.toStringUtf8());
@@ -795,10 +802,10 @@ public final class NetflixDateFunctions
     @Description("Parses a date string in a given format and returns a date string in 'yyyy-MM-dd'")
     @SqlType(VARCHAR)
     @SqlNullable
-    public static Slice nfDateString(@SqlType(VARCHAR) Slice dateString, @SqlType(VARCHAR) Slice format)
+    public static Slice nfDateString(ConnectorSession session, @SqlType(VARCHAR) Slice dateString, @SqlType(VARCHAR) Slice format)
     {
         return handleExceptions(() -> {
-            return utf8Slice(toLocalDate(dateString, format).toString());
+            return utf8Slice(toLocalDate(session, dateString, format).toString());
         }, null);
     }
 
@@ -869,7 +876,7 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             if (dateString.length() == 8) {
-                return toLocalDate(dateString, DATE_INT_FORMAT).toEpochDay();
+                return toLocalDate(session, dateString, DATE_INT_FORMAT).toEpochDay();
             }
             else if (dateString.length() == 10) {
                 return LocalDate.parse(dateString.toStringUtf8()).toEpochDay();
@@ -885,10 +892,10 @@ public final class NetflixDateFunctions
     @Description("Converts a date string in a given format to date")
     @SqlType(DATE)
     @SqlNullable
-    public static Long nfDate(@SqlType(VARCHAR) Slice dateString, @SqlType(VARCHAR) Slice format)
+    public static Long nfDate(ConnectorSession session, @SqlType(VARCHAR) Slice dateString, @SqlType(VARCHAR) Slice format)
     {
         return handleExceptions(() -> {
-            return toLocalDate(dateString, format).toEpochDay();
+            return toLocalDate(session, dateString, format).toEpochDay();
         }, null);
     }
 
@@ -968,7 +975,7 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             if (dateString.length() == 8) {
-                return scaleEpochMillisToMicros(toUnixTime(toLocalDate(dateString, DATE_INT_FORMAT), session.getTimeZoneKey()) * 1000L);
+                return scaleEpochMillisToMicros(toUnixTime(toLocalDate(session, dateString, DATE_INT_FORMAT), session.getTimeZoneKey()) * 1000L);
             }
             else if (dateString.length() == 10) {
                 return scaleEpochMillisToMicros(toUnixTime(LocalDate.parse(dateString.toStringUtf8()), session.getTimeZoneKey()) * 1000L);
@@ -988,11 +995,11 @@ public final class NetflixDateFunctions
     {
         return handleExceptions(() -> {
             try {
-                return scaleEpochMillisToMicros(toUnixTimeMs(toLocalDateTime(dateString, format), session.getTimeZoneKey()));
+                return scaleEpochMillisToMicros(toUnixTimeMs(toLocalDateTime(session, dateString, format), session.getTimeZoneKey()));
             }
             catch (Exception e) {
                 if (e instanceof DateTimeParseException) {
-                    return scaleEpochMillisToMicros(toUnixTime(toLocalDate(dateString, format), session.getTimeZoneKey()) * 1000L);
+                    return scaleEpochMillisToMicros(toUnixTime(toLocalDate(session, dateString, format), session.getTimeZoneKey()) * 1000L);
                 }
                 else {
                     throw e;

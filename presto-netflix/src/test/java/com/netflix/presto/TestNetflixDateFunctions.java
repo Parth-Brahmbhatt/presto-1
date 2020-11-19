@@ -61,6 +61,7 @@ public class TestNetflixDateFunctions
     private static final DateTime DATE_1 = new DateTime(2018, 5, 31, 0, 0, 0, 0, UTC_TIME_ZONE);
     private static final DateTime DATE_2 = new DateTime(2018, 6, 4, 0, 0, 0, 0, UTC_TIME_ZONE);
     private static final DateTime DATE_3 = new DateTime(2018, 2, 1, 0, 0, 0, 0, UTC_TIME_ZONE);
+    private static final DateTime DATE_4 = new DateTime(2018, 5, 1, 0, 0, 0, 0, UTC_TIME_ZONE);
     private static final DateTime TIMESTAMP_1 = new DateTime(2018, 5, 31, 0, 0, 0, 0, UTC_TIME_ZONE);
     private static final DateTime TIMESTAMP_2 = new DateTime(2018, 5, 31, 12, 20, 21, 10, UTC_TIME_ZONE);
     private static final DateTime TIMESTAMP_3 = new DateTime(2018, 5, 31, 22, 49, 33, 00, UTC_TIME_ZONE);
@@ -199,6 +200,8 @@ public class TestNetflixDateFunctions
         assertFunction("nf_date('2018-05-31 12:20:21.010')", DateType.DATE, toDate(DATE_1));
         assertFunction("nf_date(null)", DateType.DATE, null);
         assertFunction("nf_date('20183105', 'yyyyddMM')", DateType.DATE, toDate(DATE_1));
+        assertFunction("nf_date('31 May 2018', 'dd MMMMM yyyy')", DateType.DATE, toDate(DATE_1));
+        assertFunction("nf_date('May 2018', 'MMMMM yyyy')", DateType.DATE, toDate(DATE_4));
         assertFunction("nf_date('2018-31-05 12:20:21.010', 'yyyy-dd-MM HH:mm:ss.SSS')", DateType.DATE, toDate(DATE_1));
         assertFunction("nf_date('20183105', null)", DateType.DATE, null);
         assertFunction("nf_date(20181505)", DateType.DATE, null);
