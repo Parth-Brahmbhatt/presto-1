@@ -70,16 +70,15 @@ final class IcebergUtil
 
     public static Table getIcebergTable(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment, ConnectorSession session, IcebergTableHandle tableHandle)
     {
-        SchemaTableName table = tableHandle.getSchemaTableName();
         TableIdentifier tableIdentifier = tableHandle.toTableIdentifier();
+        SchemaTableName table = tableHandle.getSchemaTableName();
         if (MetadataTableType.from(tableIdentifier.name()) != null && tableIdentifier.namespace().levels().length == 2) {
+
             HdfsContext hdfsContext = new HdfsContext(session, table.getSchemaName(), table.getTableName());
             HiveIdentity identity = new HiveIdentity(session);
             return loadMetadataTable(MetadataTableType.from(tableIdentifier.name()), table, metastore, hdfsEnvironment, hdfsContext, identity);
         }
-        else {
-            return getIcebergTable(metastore, hdfsEnvironment, session, table);
-        }
+        return getIcebergTable(metastore, hdfsEnvironment, session, table);
     }
 
     public static Table getIcebergTable(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment, ConnectorSession session, SchemaTableName table)

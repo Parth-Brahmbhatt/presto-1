@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.iceberg;
 
+import com.google.common.base.VerifyException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.memory.context.AggregatedMemoryContext;
@@ -178,7 +179,7 @@ public class IcebergPageSourceProvider
                 HadoopFileIO fileIO = new HadoopFileIO(hdfsEnvironment.getConfiguration(hdfsContext, path));
                 return new FilesPageSource(fileIO, icebergColumns, split.getPath());
             default:
-                throw new PrestoException(IcebergErrorCode.ICEBERG_UNKNOWN_TABLE_TYPE, "not supported" + table.getTableType());
+                throw new VerifyException("Unhandled table type: " + table.getTableType());
         }
     }
 

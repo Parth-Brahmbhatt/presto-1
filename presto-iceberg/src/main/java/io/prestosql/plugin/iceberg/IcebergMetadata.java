@@ -99,6 +99,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.Maps.uniqueIndex;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static io.prestosql.plugin.hive.HiveMetadata.PRESTO_QUERY_ID_NAME;
 import static io.prestosql.plugin.hive.HiveMetadata.STORAGE_TABLE;
@@ -306,9 +307,10 @@ public class IcebergMetadata
         ImmutableList.Builder<IcebergColumnHandle> columns = new ImmutableList.Builder<>();
         switch (table.getTableType()) {
             case FILES:
-                IcebergTableHandle tblHandle = new IcebergTableHandle(table.getSchemaName(), table.getTableName(), DATA, table.getSnapshotId(), table.getUnenforcedPredicate(), table.getEnforcedPredicate());
-                org.apache.iceberg.Table sourceTable = getIcebergTable(metastore, hdfsEnvironment, session, tblHandle);
-                FilesTable filesTable = new FilesTable(sourceTable.schema(), typeManager);
+                IcebergTableHandle dataTableHandle = new IcebergTableHandle(table.getSchemaName(), table.getTableName(), DATA, table.getSnapshotId(), table.getUnenforcedPredicate(), table.getEnforcedPredicate());
+                org.apache.iceberg.Table sourceTable = getIcebergTable(metastore, hdfsEnvironment, session, dataTableHandle);
+                final PartitionSpec partitionSpec = sourceTable.spec();
+                FilesTable filesTable = new FilesTable(sourceTable.schema(), partitionSpec, typeManager);
                 columns.addAll(filesTable.getColumnHandles());
                 break;
             case DATA:
@@ -316,7 +318,7 @@ public class IcebergMetadata
                 columns.addAll(getColumns(icebergTable.schema(), typeManager));
                 break;
             default:
-                throw new PrestoException(IcebergErrorCode.ICEBERG_UNKNOWN_TABLE_TYPE, "not supported" + table.getTableType());
+                throw new VerifyException("Unhandled table type: " + table.getTableType());
         }
         return columns.build().stream()
             .collect(toImmutableMap(IcebergColumnHandle::getName, identity()));
@@ -604,7 +606,7 @@ public class IcebergMetadata
 
         switch (tableHandle.getTableType()) {
             case FILES:
-                FilesTable filesTable = new FilesTable(icebergTable.schema(), typeManager);
+                FilesTable filesTable = new FilesTable(icebergTable.schema(), icebergTable.spec(), typeManager);
                 columns.addAll(filesTable.getColumnMetadata());
                 break;
             case DATA:
@@ -615,7 +617,7 @@ public class IcebergMetadata
                 }
                 break;
             default:
-                throw new PrestoException(IcebergErrorCode.ICEBERG_UNKNOWN_TABLE_TYPE, "not supported" + tableHandle.getTableType());
+                throw new VerifyException("Unhandled table type: " + tableHandle.getTableType());
         }
         return new ConnectorTableMetadata(table, columns.build(), properties.build(), getTableComment(icebergTable));
     }

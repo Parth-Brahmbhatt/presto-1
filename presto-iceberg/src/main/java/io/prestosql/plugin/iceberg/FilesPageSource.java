@@ -24,6 +24,7 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.GenericManifestFile;
 import org.apache.iceberg.ManifestContent;
 import org.apache.iceberg.ManifestFiles;
+import org.apache.iceberg.StructLike;
 import org.apache.iceberg.io.FileIO;
 
 import java.util.Iterator;
@@ -111,7 +112,10 @@ public class FilesPageSource
             pageListBuilder.appendVarbinary(dataFile.keyMetadata() == null ? null : Slices.wrappedBuffer(dataFile.keyMetadata()));
             pageListBuilder.appendBigintArray(dataFile.splitOffsets());
 
-            columnHandles.forEach(columnHandle -> {
+            final StructLike partition = dataFile.partition();
+            int partitionIndex = 0;
+
+            for (IcebergColumnHandle columnHandle : columnHandles) {
                 Integer id = columnHandle.getId();
                 if (id > 0) {
                     final BlockBuilder rowBuilder = pageListBuilder.nextColumn();
@@ -135,7 +139,16 @@ public class FilesPageSource
                     }
                     rowBuilder.closeEntry();
                 }
-            });
+                else if (id == -1) { // indicates partition key
+                    final BlockBuilder blockBuilder = pageListBuilder.nextColumn();
+                    final org.apache.iceberg.types.Type icebergType = toIcebergType(columnHandle.getType());
+                    writeNativeValue(
+                            columnHandle.getType(),
+                            blockBuilder,
+                            convert(partition.get(partitionIndex, icebergType.typeId().javaClass()), icebergType));
+                    partitionIndex++;
+                }
+            }
             pageListBuilder.endRow();
         }
 
