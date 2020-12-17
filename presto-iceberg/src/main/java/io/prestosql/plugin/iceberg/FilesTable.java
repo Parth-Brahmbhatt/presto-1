@@ -43,14 +43,15 @@ import static org.apache.iceberg.types.Types.NestedField.optional;
 
 public class FilesTable
 {
-    public static final IcebergColumnHandle FILE_PATH = new IcebergColumnHandle(-2, "file_path", VARCHAR, Optional.empty());
-    public static final IcebergColumnHandle FILE_FORMAT = new IcebergColumnHandle(-3, "file_format", VARCHAR, Optional.empty());
-    public static final IcebergColumnHandle RECORD_COUNT = new IcebergColumnHandle(-4, "record_count", BIGINT, Optional.empty());
-    public static final IcebergColumnHandle FILE_SIZE_IN_BYTES = new IcebergColumnHandle(-5, "file_size_in_bytes", BIGINT, Optional.empty());
-    public static final IcebergColumnHandle FILE_ORDINAL = new IcebergColumnHandle(-6, "file_ordinal", INTEGER, Optional.empty());
-    public static final IcebergColumnHandle SORT_COLUMNS = new IcebergColumnHandle(-7, "sort_columns", new ArrayType(INTEGER), Optional.empty());
-    public static final IcebergColumnHandle KEY_METADATA = new IcebergColumnHandle(-8, "key_metadata", VARBINARY, Optional.empty());
-    public static final IcebergColumnHandle SPLIT_OFFSETS = new IcebergColumnHandle(-9, "split_offsets", new ArrayType(BIGINT), Optional.empty());
+    public static final IcebergColumnHandle FILE_PATH = new IcebergColumnHandle(-1, "file_path", VARCHAR, Optional.empty());
+    public static final IcebergColumnHandle FILE_FORMAT = new IcebergColumnHandle(-2, "file_format", VARCHAR, Optional.empty());
+    public static final IcebergColumnHandle RECORD_COUNT = new IcebergColumnHandle(-3, "record_count", BIGINT, Optional.empty());
+    public static final IcebergColumnHandle FILE_SIZE_IN_BYTES = new IcebergColumnHandle(-4, "file_size_in_bytes", BIGINT, Optional.empty());
+    public static final IcebergColumnHandle FILE_ORDINAL = new IcebergColumnHandle(-5, "file_ordinal", INTEGER, Optional.empty());
+    public static final IcebergColumnHandle SORT_COLUMNS = new IcebergColumnHandle(-6, "sort_columns", new ArrayType(INTEGER), Optional.empty());
+    public static final IcebergColumnHandle KEY_METADATA = new IcebergColumnHandle(-7, "key_metadata", VARBINARY, Optional.empty());
+    public static final IcebergColumnHandle SPLIT_OFFSETS = new IcebergColumnHandle(-8, "split_offsets", new ArrayType(BIGINT), Optional.empty());
+    public static final int LAST_METADATA_INDEX = SPLIT_OFFSETS.getId();
     public static final String COLUMN_SIZE = "column_size";
     public static final String VALUE_COUNTS = "value_counts";
     public static final String NULL_VALUE_COUNTS = "null_value_counts";
@@ -97,9 +98,10 @@ public class FilesTable
                         field -> {
                             final String name = field.transform().isIdentity() ? schema.findField(field.sourceId()).name() : field.name();
                             partitionColumnNames.add(name);
+                            int index = LAST_METADATA_INDEX - partitionColumnNames.size();
                             columnHandleBuilder.add(
                                 new IcebergColumnHandle(
-                                        -1,
+                                        index,
                                         name,
                                         toPrestoType(field.transform().getResultType(schema.findType(field.sourceId())), typeManager),
                                         Optional.empty()));
