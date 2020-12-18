@@ -47,6 +47,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
+import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.MaterializedViewFreshness;
@@ -94,6 +95,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -129,6 +131,7 @@ import static io.prestosql.plugin.iceberg.PartitionFields.parsePartitionFields;
 import static io.prestosql.plugin.iceberg.PartitionFields.toPartitionFields;
 import static io.prestosql.plugin.iceberg.TableType.DATA;
 import static io.prestosql.plugin.iceberg.TableType.FILES;
+import static io.prestosql.plugin.iceberg.TableType.PARTITIONS;
 import static io.prestosql.plugin.iceberg.TypeConverter.toIcebergType;
 import static io.prestosql.plugin.iceberg.TypeConverter.toPrestoType;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
@@ -260,8 +263,8 @@ public class IcebergMetadata
                     throw new PrestoException(NOT_SUPPORTED, "Snapshot ID not supported for snapshots table: " + systemTableName);
                 }
                 return Optional.of(new SnapshotsTable(systemTableName, typeManager, table));
-            case PARTITIONS:
-                return Optional.of(new PartitionTable(systemTableName, typeManager, table, getSnapshotId(table, name.getSnapshotId())));
+//            case PARTITIONS:
+//                return Optional.of(new PartitionTable(systemTableName, typeManager, table, getSnapshotId(table, name.getSnapshotId())));
             case MANIFESTS:
                 return Optional.of(new ManifestsTable(systemTableName, table, getSnapshotId(table, name.getSnapshotId())));
         }
@@ -965,6 +968,71 @@ public class IcebergMetadata
             new HashMap<>(materializedView.getParameters())));
     }
 
+    @Override
+    public Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
+    {
+        IcebergTableName icebergTableName = IcebergTableName.from(viewName.getTableName());
+        if(icebergTableName.getTableType().equals(PARTITIONS)) {
+            // generate sql and return the view definition with generated sql
+            org.apache.iceberg.Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, new SchemaTableName(viewName.getSchemaName(), icebergTableName.getTableName()));
+            Schema schema = icebergTable.schema();
+            PartitionSpec partitionSpec = icebergTable.spec();
+            List<String> partitionColumnNames = IcebergUtil.partitionColumnNames(schema, partitionSpec);
+
+
+            final String partition_columns = partitionColumnNames.stream().collect(joining(","));
+            final String dataColumnFormat = "min(%s.lower_bound) as min_%s, max(%s.upper_bound) as max_%s, sum(%s.null_value_counts) as null_count_%s";
+            final String dataOuterFormat = "cast(ROW(min_%s,max_%s,null_count_%s) as ROW(min %s,max %s, null_count BIGINT)) as %s";
+            final List<NestedField> dataColumns = schema.columns().stream()
+                    .filter(column -> !partitionColumnNames.contains(column.name()))
+                    .collect(Collectors.toUnmodifiableList());
+
+            final String dataOuterSelect = dataColumns.stream()
+                    .map(column -> {
+                        final String displayName = toPrestoType(column.type(), typeManager).getDisplayName();
+                        return String.format(dataOuterFormat, column.name(), column.name(), column.name(), displayName, displayName, column.name());
+                    })
+                    .collect(joining(","));
+
+            final String dataInnerSelect = dataColumns.stream()
+                    .map(column -> String.format(dataColumnFormat, column.name(), column.name(), column.name(), column.name(), column.name(), column.name()))
+                    .collect(joining(","));
+
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append(" select ");
+            stringBuilder.append(partition_columns);
+            stringBuilder.append(" ,row_count, file_count, total_size, ");
+            stringBuilder.append(dataOuterSelect);
+            stringBuilder.append(" from ( select ");
+            stringBuilder.append(partition_columns);
+            stringBuilder.append(" ,sum(record_count) as row_count,count (distinct file_path) file_count,sum(file_size_in_bytes) as total_size, ");
+            stringBuilder.append(dataInnerSelect);
+            stringBuilder.append(" from "+ viewName.getSchemaName() + ".\"" + icebergTableName.getTableName() + "$files\" " );
+            stringBuilder.append(" group by ");
+            stringBuilder.append(partition_columns);
+            stringBuilder.append(")");
+
+            final String viewSqlText = stringBuilder.toString();
+
+            return Optional.of(new ConnectorViewDefinition(
+                    viewSqlText,
+                    Optional.empty(),
+                    Optional.of(viewName.getSchemaName()),
+                    null, //TODO columns
+                    Optional.empty(),
+                    Optional.empty(),
+                    true
+                    ));
+            // select partition_columns, row_count, file_count, total_size,
+            // cast( ROW(min_data_column,max_data_column,null_count_data_column) as ROW(min BIGINT,max BIGINT, null_count BIGINT)) as data_column
+            // from
+            // (select  partition_columns, sum(record_count) as row_count,count (distinct file_path) file_count,sum(file_size_in_bytes) as total_size,
+            //          min(data_column.lower_bound) as min_data_column, max(data_column.upper_bound) as max_data_column, sum(data_column.null_value_counts) as null_count_data_column
+            //         from schema."table$files" group by partition_columns)
+        }
+        return Optional.empty();
+    }
+
     public Optional<TableToken> getTableToken(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         IcebergTableHandle table = (IcebergTableHandle) tableHandle;
@@ -1046,4 +1114,5 @@ public class IcebergMetadata
             return this.snapshotId;
         }
     }
+
 }

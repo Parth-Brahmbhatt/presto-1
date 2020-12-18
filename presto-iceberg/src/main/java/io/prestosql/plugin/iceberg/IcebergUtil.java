@@ -45,6 +45,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.reverse;
@@ -156,6 +157,12 @@ final class IcebergUtil
             return name;
         }
         return '"' + name.replace("\"", "\"\"") + '"';
+    }
+
+    public static List<String> partitionColumnNames(Schema schema, PartitionSpec partitionSpec) {
+       return partitionSpec.fields().stream()
+                .map(field -> field.transform().isIdentity() ? schema.findField(field.sourceId()).name() : field.name())
+                .collect(Collectors.toUnmodifiableList());
     }
 
     private static Table loadMetadataTable(

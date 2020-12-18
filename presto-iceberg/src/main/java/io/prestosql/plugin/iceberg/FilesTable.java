@@ -22,14 +22,13 @@ import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.RowType.Field;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -92,22 +91,17 @@ public class FilesTable
                     columnHandleBuilder.add(columnHandle);
                 });
 
-        Set<String> partitionColumnNames = new HashSet<>();
-        partitionSpec.fields().stream()
-                .forEach(
-                        field -> {
-                            final String name = field.transform().isIdentity() ? schema.findField(field.sourceId()).name() : field.name();
-                            partitionColumnNames.add(name);
-                            int index = LAST_METADATA_INDEX - partitionColumnNames.size();
-                            columnHandleBuilder.add(
-                                new IcebergColumnHandle(
-                                        index,
-                                        name,
-                                        toPrestoType(field.transform().getResultType(schema.findType(field.sourceId())), typeManager),
-                                        Optional.empty()));
-                        }
-
-                );
+        List<String> partitionColumnNames = IcebergUtil.partitionColumnNames(schema, partitionSpec);
+        for (int i = 0; i < partitionColumnNames.size(); i++) {
+            int index = LAST_METADATA_INDEX - i - 1;
+            PartitionField field = partitionSpec.fields().get(i);
+            columnHandleBuilder.add(
+                    new IcebergColumnHandle(
+                            index,
+                            partitionColumnNames.get(i),
+                            toPrestoType(field.transform().getResultType(schema.findType(field.sourceId())), typeManager),
+                            Optional.empty()));
+        }
 
         columnHandles = columnHandleBuilder.build().stream()
             .filter(columnHandle -> columnHandle.getId() < 0 || !partitionColumnNames.contains(columnHandle.getName()))
