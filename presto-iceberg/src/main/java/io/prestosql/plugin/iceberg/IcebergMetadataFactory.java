@@ -14,6 +14,7 @@
 package io.prestosql.plugin.iceberg;
 
 import io.airlift.json.JsonCodec;
+import io.prestosql.plugin.base.CatalogName;
 import io.prestosql.plugin.hive.HdfsEnvironment;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.spi.type.TypeManager;
@@ -24,6 +25,7 @@ import static java.util.Objects.requireNonNull;
 
 public class IcebergMetadataFactory
 {
+    private final CatalogName catalogName;
     private final HiveMetastore metastore;
     private final HdfsEnvironment hdfsEnvironment;
     private final TypeManager typeManager;
@@ -31,21 +33,24 @@ public class IcebergMetadataFactory
 
     @Inject
     public IcebergMetadataFactory(
+            CatalogName catalogName,
             IcebergConfig config,
             HiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> commitTaskDataJsonCodec)
     {
-        this(metastore, hdfsEnvironment, typeManager, commitTaskDataJsonCodec);
+        this(catalogName, metastore, hdfsEnvironment, typeManager, commitTaskDataJsonCodec);
     }
 
     public IcebergMetadataFactory(
+            CatalogName catalogName,
             HiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> commitTaskCodec)
     {
+        this.catalogName = catalogName;
         this.metastore = requireNonNull(metastore, "metastore is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
@@ -54,6 +59,6 @@ public class IcebergMetadataFactory
 
     public IcebergMetadata create()
     {
-        return new IcebergMetadata(metastore, hdfsEnvironment, typeManager, commitTaskCodec);
+        return new IcebergMetadata(catalogName, metastore, hdfsEnvironment, typeManager, commitTaskCodec);
     }
 }

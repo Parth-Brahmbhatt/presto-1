@@ -21,6 +21,7 @@ import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFilesTable;
@@ -73,7 +74,6 @@ final class IcebergUtil
         TableIdentifier tableIdentifier = tableHandle.toTableIdentifier();
         SchemaTableName table = tableHandle.getSchemaTableName();
         if (MetadataTableType.from(tableIdentifier.name()) != null && tableIdentifier.namespace().levels().length == 2) {
-
             HdfsContext hdfsContext = new HdfsContext(session, table.getSchemaName(), table.getTableName());
             HiveIdentity identity = new HiveIdentity(session);
             return loadMetadataTable(MetadataTableType.from(tableIdentifier.name()), table, metastore, hdfsEnvironment, hdfsContext, identity);
@@ -156,6 +156,17 @@ final class IcebergUtil
             return name;
         }
         return '"' + name.replace("\"", "\"\"") + '"';
+    }
+
+    public static Map<String, Type> toPartitionColumnMap(Schema schema, PartitionSpec partitionSpec, TypeManager typeManager)
+    {
+        final ImmutableMap.Builder<String, Type> mapBuilder = ImmutableMap.builder();
+        for (PartitionField field : partitionSpec.fields()) {
+            String name = field.transform().isIdentity() ? schema.findField(field.sourceId()).name() : field.name();
+            Type type = toPrestoType(field.transform().getResultType(schema.findType(field.sourceId())), typeManager);
+            mapBuilder.put(name, type);
+        }
+        return mapBuilder.build();
     }
 
     private static Table loadMetadataTable(
