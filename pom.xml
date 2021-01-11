@@ -189,6 +189,12 @@
             <id>confluent</id>
             <url>http://packages.confluent.io/maven/</url>
         </repository>
+
+        <repository>
+            <id>libs-archives-local</id>
+            <name>Netflix Artifactory</name>
+            <url>http://artifacts.netflix.com/libs-archives-local</url>
+        </repository>
     </repositories>
 
     <dependencyManagement>
