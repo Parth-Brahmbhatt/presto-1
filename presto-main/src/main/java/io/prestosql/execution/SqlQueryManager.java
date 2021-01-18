@@ -23,8 +23,6 @@ import io.prestosql.ExceededCpuLimitException;
 import io.prestosql.ExceededDataSizeLimitException;
 import io.prestosql.ExceededScanLimitException;
 import io.prestosql.Session;
-import io.prestosql.SystemSessionProperties;
-import io.prestosql.event.QueryMonitor;
 import io.prestosql.execution.QueryExecution.QueryOutputInfo;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.memory.ClusterMemoryManager;

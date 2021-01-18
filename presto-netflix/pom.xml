@@ -6,7 +6,7 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.prestosql</groupId>
-        <version>342</version>
+        <version>350</version>
     </parent>
 
     <artifactId>presto-netflix</artifactId>
@@ -75,6 +75,7 @@
         <dependency>
             <groupId>com.jayway.jsonpath</groupId>
             <artifactId>json-path</artifactId>
+            <version>2.4.0</version>
         </dependency>
 
         <dependency>
@@ -149,5 +150,12 @@
             <artifactId>testng</artifactId>
             <scope>test</scope>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.jayway.jsonpath</groupId>-->
+<!--            <artifactId>json-path</artifactId>-->
+<!--            <version>2.4.0</version>-->
+<!--            <scope>compile</scope>-->
+<!--        </dependency>-->
+<!--        anjali remove this-->
     </dependencies>
 </project>

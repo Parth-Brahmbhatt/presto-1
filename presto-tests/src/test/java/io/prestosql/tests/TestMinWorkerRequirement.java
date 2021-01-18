@@ -257,7 +257,7 @@ public class TestMinWorkerRequirement
     {
         try (DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
                 .setSingleCoordinatorProperty("query-manager.initialization-required-workers", "5")
-                .setSingleExtraProperty("query-manager.queue-queries.insufficient-workers", "true")
+                .addExtraProperty("query-manager.queue-queries.insufficient-workers", "true")
                 .setNodeCount(4)
                 .build()) {
             QueryId scheduled = createQuery(queryRunner, newSession("scheduled", ImmutableSet.of(), null), "SELECT 1");
@@ -299,7 +299,7 @@ public class TestMinWorkerRequirement
     {
         try (DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
                 .setSingleCoordinatorProperty("query-manager.initialization-required-workers", "4")
-                .setSingleExtraProperty("query-manager.queue-queries.insufficient-workers", "true")
+                .addExtraProperty("query-manager.queue-queries.insufficient-workers", "true")
                 .setNodeCount(4)
                 .build()) {
             QueryId scheduled = createQuery(queryRunner, newSession("scheduled", ImmutableSet.of(), null), "SELECT 1");

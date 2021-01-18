@@ -31,15 +31,12 @@ import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
 import javax.inject.Inject;
-import org.apache.iceberg.TableOperations;
 
 import java.util.List;
 import java.util.Locale;
@@ -47,9 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Lists.reverse;
-import static com.google.common.collect.Streams.stream;
 import static com.google.shaded.shaded.common.collect.Maps.uniqueIndex;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
@@ -66,7 +61,8 @@ final class IcebergUtil
 {
     private static final Pattern SIMPLE_NAME = Pattern.compile("[a-z][a-z0-9]*");
 
-    private IcebergUtil() {}
+    // private IcebergUtil() {} anjali remove
+
     public static final String NETFLIX_METACAT_HOST = "netflix.metacat.host";
     public static final String NETFLIX_WAREHOUSE_DIR = "hive.metastore.warehouse.dir";
     public static final String APP_NAME = "presto-" + System.getenv("stack");

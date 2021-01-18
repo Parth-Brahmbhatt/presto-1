@@ -2150,8 +2150,9 @@ public final class MetadataManager
         String originalSql = view.getOriginalSql();
         try {
             SqlParser sqlParser = new SqlParser();
-            Analyzer analyzer = new Analyzer(session, this, sqlParser, new AllowAllAccessControl(), Optional.<QueryExplainer>empty(),
-                    new ArrayList(), new HashMap<>(), WarningCollector.NOOP);
+            // @todo(anjali) group provider and stats collector are being sent as null .. hack .. fix it
+            Analyzer analyzer = new Analyzer(session, this, sqlParser, null, new AllowAllAccessControl(), Optional.<QueryExplainer>empty(),
+                    new ArrayList(), new HashMap<>(), WarningCollector.NOOP, null);
             io.prestosql.sql.tree.Statement statement = null;
             try {
                 statement = sqlParser.createStatement(sql, new ParsingOptions(ParsingOptions.DecimalLiteralTreatment.AS_DECIMAL));

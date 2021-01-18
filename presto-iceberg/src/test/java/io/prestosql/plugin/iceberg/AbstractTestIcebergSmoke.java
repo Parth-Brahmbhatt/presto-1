@@ -597,7 +597,7 @@ public abstract class AbstractTestIcebergSmoke
     public void testLargeInFailureOnPartitionedColumns()
     {
         QualifiedObjectName tableName = new QualifiedObjectName("iceberg", "tpch", "test_large_in_failure");
-        assertUpdate(format("CREATE TABLE %s (col1 BIGINT, col2 BIGINT) WITH (partitioning = ARRAY['col2'])",
+        assertUpdate(format("CREATE TABLE %s (col1 BIGINT, col2 BIGINT) WITH (partitioned_by = ARRAY['col2'])",
                 tableName));
         assertUpdate(format("INSERT INTO %s VALUES (1, 10)", tableName), 1L);
         assertUpdate(format("INSERT INTO %s VALUES (2, 20)", tableName), 1L);
@@ -1315,7 +1315,7 @@ public abstract class AbstractTestIcebergSmoke
     public void testPredicatePushdown()
     {
         QualifiedObjectName tableName = new QualifiedObjectName("iceberg", "tpch", "test_predicate");
-        assertUpdate(format("CREATE TABLE %s (col1 BIGINT, col2 BIGINT, col3 BIGINT) WITH (partitioning = ARRAY['col2', 'col3'])", tableName));
+        assertUpdate(format("CREATE TABLE %s (col1 BIGINT, col2 BIGINT, col3 BIGINT) WITH (partitioned_by = ARRAY['col2', 'col3'])", tableName));
         assertUpdate(format("INSERT INTO %s VALUES (1, 10, 100)", tableName), 1L);
         assertUpdate(format("INSERT INTO %s VALUES (2, 20, 200)", tableName), 1L);
 

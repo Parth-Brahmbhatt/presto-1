@@ -217,7 +217,6 @@ import static io.prestosql.plugin.hive.PartitionUpdate.UpdateMode.OVERWRITE;
 import static io.prestosql.plugin.hive.ViewReaderUtil.PRESTO_VIEW_FLAG;
 import static io.prestosql.plugin.hive.ViewReaderUtil.createViewReader;
 import static io.prestosql.plugin.hive.ViewReaderUtil.encodeViewData;
-import static io.prestosql.plugin.hive.ViewReaderUtil.isHiveOrPrestoView;
 import static io.prestosql.plugin.hive.ViewReaderUtil.isPrestoView;
 import static io.prestosql.plugin.hive.acid.AcidTransaction.NO_ACID_TRANSACTION;
 import static io.prestosql.plugin.hive.acid.AcidTransaction.forCreateTable;
@@ -1914,6 +1913,7 @@ public class HiveMetadata
         return handle.getTableParameters().isEmpty() || !isFullAcidTable(handle.getTableParameters().get());
     }
 
+    //@todo(anjali) graft our view changes given this changed considerably
     @Override
     public Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
     {
@@ -1921,72 +1921,101 @@ public class HiveMetadata
             return Optional.empty();
         }
         return metastore.getTable(new HiveIdentity(session), viewName.getSchemaName(), viewName.getTableName())
-                .filter(ViewReaderUtil::canDecodeView)
-                .map(view -> {
-                    if (!translateHiveViews && !isPrestoView(view)) {
-                        throw new HiveViewNotSupportedException(viewName);
-                    }
-
-                    ConnectorViewDefinition definition = createViewReader(metastore, session, view, typeManager)
-                            .decodeViewData(view.getViewOriginalText().get(), view, catalogName);
-                    // use owner from table metadata if it exists
-                    if (view.getOwner() != null && !definition.isRunAsInvoker()) {
-                        definition = new ConnectorViewDefinition(
-                                definition.getOriginalSql(),
-                                definition.getCatalog(),
-                                definition.getSchema(),
-                                definition.getColumns(),
-                                definition.getComment(),
-                                Optional.of(view.getOwner()),
-                                false);
-                    }
-                    if (translateHiveViews && isHiveOrPrestoView(view)) {
-                        return Optional.of(buildHiveViewConnectorDefinition(catalogName, view));
-                    }
-                    if (isPrestoView(view)) {
-                        return Optional.of(new ConnectorViewDefinition(
-                            view.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
-                            view.getViewExpandedText(),
-                            Optional.of(viewName.getSchemaName()),
-                            Optional.of(view.getOwner().replaceAll("@.*", ""))));
-                    }
-                    return Optional.empty();
-                });
-    }
-
-    @Override
-    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
-    {
-        ImmutableMap.Builder<SchemaTableName, ConnectorViewDefinition> views = ImmutableMap.builder();
-        List<SchemaTableName> tableNames;
-
-        tableNames = listViews(session, schemaName);
-        for (SchemaTableName schemaTableName : tableNames) {
-            Optional<Table> table = metastore.getTable(new HiveIdentity(session), schemaTableName.getSchemaName(), schemaTableName.getTableName());
-            if (table.isPresent() && table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
-                Table tbl = table.get();
-                ConnectorViewDefinition viewDefinition = "true".equals(tbl.getParameters().get(PRESTO_VIEW_FLAG)) ? decodeViewData(tbl.getViewOriginalText().get()) : null;
-                if (viewDefinition != null) {
-                    views.put(schemaTableName, new ConnectorViewDefinition(
-                            viewDefinition.getOriginalSql(),
-                            viewDefinition.getCatalog(),
-                            viewDefinition.getSchema(),
-                            viewDefinition.getColumns(), //need view columns
-                            viewDefinition.getComment(),
-                            viewDefinition.getOwner(),
-                            viewDefinition.isRunAsInvoker()));
+            .filter(ViewReaderUtil::canDecodeView)
+            .map(view -> {
+                if (!translateHiveViews && !isPrestoView(view)) {
+                    throw new HiveViewNotSupportedException(viewName);
                 }
-                else {
-                    views.put(schemaTableName, new ConnectorViewDefinition(
-                            tbl.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
-                            tbl.getViewExpandedText(),
-                            Optional.of(tbl.getSchemaTableName().getSchemaName()),
-                            Optional.of(tbl.getOwner().replaceAll("@.*", ""))));
+
+                ConnectorViewDefinition definition = createViewReader(metastore, session, view, typeManager)
+                        .decodeViewData(view.getViewOriginalText().get(), view, catalogName);
+                // use owner from table metadata if it exists
+                if (view.getOwner() != null && !definition.isRunAsInvoker()) {
+                    definition = new ConnectorViewDefinition(
+                        definition.getOriginalSql(),
+                        definition.getCatalog(),
+                        definition.getSchema(),
+                        definition.getColumns(),
+                        definition.getComment(),
+                        Optional.of(view.getOwner()),
+                        false);
                 }
-            }
-        }
-        return views.build();
+                return definition;
+            });
     }
+//    @Override
+//    public Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
+//    {
+//        if (!filterSchema(viewName.getSchemaName())) {
+//            return Optional.empty();
+//        }
+//        return metastore.getTable(new HiveIdentity(session), viewName.getSchemaName(), viewName.getTableName())
+//                .filter(ViewReaderUtil::canDecodeView)
+//                .map(view -> {
+//                    if (!translateHiveViews && !isPrestoView(view)) {
+//                        throw new HiveViewNotSupportedException(viewName);
+//                    }
+//
+//                    ConnectorViewDefinition definition = createViewReader(metastore, session, view, typeManager)
+//                            .decodeViewData(view.getViewOriginalText().get(), view, catalogName);
+//                    // use owner from table metadata if it exists
+//                    if (view.getOwner() != null && !definition.isRunAsInvoker()) {
+//                        definition = new ConnectorViewDefinition(
+//                                definition.getOriginalSql(),
+//                                definition.getCatalog(),
+//                                definition.getSchema(),
+//                                definition.getColumns(),
+//                                definition.getComment(),
+//                                Optional.of(view.getOwner()),
+//                                false);
+//                    }
+////                    if (translateHiveViews && isHiveOrPrestoView(view)) {
+////                        return Optional.of(buildHiveViewConnectorDefinition(catalogName, view));
+////                    }
+//                    if (isPrestoView(view)) {
+//                        return Optional.of(new ConnectorViewDefinition(
+//                            view.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
+//                            view.getViewExpandedText(),
+//                            Optional.of(viewName.getSchemaName()),
+//                            Optional.of(view.getOwner().replaceAll("@.*", ""))));
+//                    }
+//                    return Optional.empty();
+//                });
+//    }
+//    @todo(anjali) fix along with common views
+//    @Override
+//    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
+//    {
+//        ImmutableMap.Builder<SchemaTableName, ConnectorViewDefinition> views = ImmutableMap.builder();
+//        List<SchemaTableName> tableNames;
+//
+//        tableNames = listViews(session, schemaName);
+//        for (SchemaTableName schemaTableName : tableNames) {
+//            Optional<Table> table = metastore.getTable(new HiveIdentity(session), schemaTableName.getSchemaName(), schemaTableName.getTableName());
+//            if (table.isPresent() && table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
+//                Table tbl = table.get();
+//                ConnectorViewDefinition viewDefinition = "true".equals(tbl.getParameters().get(PRESTO_VIEW_FLAG)) ? decodeViewData(tbl.getViewOriginalText().get()) : null;
+//                if (viewDefinition != null) {
+//                    views.put(schemaTableName, new ConnectorViewDefinition(
+//                            viewDefinition.getOriginalSql(),
+//                            viewDefinition.getCatalog(),
+//                            viewDefinition.getSchema(),
+//                            viewDefinition.getColumns(), //need view columns
+//                            viewDefinition.getComment(),
+//                            viewDefinition.getOwner(),
+//                            viewDefinition.isRunAsInvoker()));
+//                }
+//                else {
+//                    views.put(schemaTableName, new ConnectorViewDefinition(
+//                            tbl.getViewOriginalText().orElseThrow(() -> new IllegalStateException("original sql must not be missing")),
+//                            tbl.getViewExpandedText(),
+//                            Optional.of(tbl.getSchemaTableName().getSchemaName()),
+//                            Optional.of(tbl.getOwner().replaceAll("@.*", ""))));
+//                }
+//            }
+//        }
+//        return views.build();
+//    }
 
     private boolean isHiveOrPrestoView(Table table)
     {

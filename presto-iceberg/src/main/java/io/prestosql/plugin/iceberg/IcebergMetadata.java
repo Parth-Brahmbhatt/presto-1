@@ -148,7 +148,6 @@ import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
 import static org.apache.iceberg.TableMetadata.newTableMetadata;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT_DEFAULT;
-import static org.apache.iceberg.Transactions.createTableTransaction;
 
 public class IcebergMetadata
         implements ConnectorMetadata
@@ -229,8 +228,12 @@ public class IcebergMetadata
             throw new UnknownTableTypeException(tableName);
         }
 
-        org.apache.iceberg.Table table = getIcebergTable(metastore, hdfsEnvironment, session, hiveTable.get().getSchemaTableName());
-        Optional<Long> snapshotId = getSnapshotId(table, name.getSnapshotId());
+        Optional<org.apache.iceberg.Table> table = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, hiveTable.get().getSchemaTableName());
+        if (table.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + hiveTable.get().getSchemaTableName().toString());
+        }
+
+        Optional<Long> snapshotId = getSnapshotId(table.get(), name.getSnapshotId());
 
         return new IcebergTableHandle(
                 tableName.getSchemaName(),
@@ -257,7 +260,10 @@ public class IcebergMetadata
             return Optional.empty();
         }
 
-        org.apache.iceberg.Table table = getIcebergTable(metastore, hdfsEnvironment, session, hiveTable.get().getSchemaTableName());
+        Optional<org.apache.iceberg.Table> table = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, hiveTable.get().getSchemaTableName());
+        if (table.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + hiveTable.get().getSchemaTableName().toString());
+        }
 
         SchemaTableName systemTableName = new SchemaTableName(tableName.getSchemaName(), name.getTableNameWithType());
         switch (name.getTableType()) {
@@ -265,18 +271,18 @@ public class IcebergMetadata
                 if (name.getSnapshotId().isPresent()) {
                     throw new PrestoException(NOT_SUPPORTED, "Snapshot ID not supported for history table: " + systemTableName);
                 }
-                return Optional.of(new HistoryTable(systemTableName, table));
+                return Optional.of(new HistoryTable(systemTableName, table.get()));
             case SNAPSHOTS:
                 if (name.getSnapshotId().isPresent()) {
                     throw new PrestoException(NOT_SUPPORTED, "Snapshot ID not supported for snapshots table: " + systemTableName);
                 }
-                return Optional.of(new SnapshotsTable(systemTableName, typeManager, table));
+                return Optional.of(new SnapshotsTable(systemTableName, typeManager, table.get()));
             case PARTITIONS:
-                return Optional.of(new PartitionTable(systemTableName, typeManager, table, getSnapshotId(table, name.getSnapshotId())));
+                return Optional.of(new PartitionTable(systemTableName, typeManager, table.get(), getSnapshotId(table.get(), name.getSnapshotId())));
             case MANIFESTS:
-                return Optional.of(new ManifestsTable(systemTableName, table, getSnapshotId(table, name.getSnapshotId())));
+                return Optional.of(new ManifestsTable(systemTableName, table.get(), getSnapshotId(table.get(), name.getSnapshotId())));
             case FILES:
-                return Optional.of(new FilesTable(systemTableName, typeManager, table, getSnapshotId(table, name.getSnapshotId())));
+                return Optional.of(new FilesTable(systemTableName, typeManager, table.get(), getSnapshotId(table.get(), name.getSnapshotId())));
         }
         return Optional.empty();
     }
@@ -714,12 +720,15 @@ public class IcebergMetadata
     public Optional<ConstraintApplicationResult<ConnectorTableHandle>> applyFilter(ConnectorSession session, ConnectorTableHandle handle, Constraint constraint)
     {
         IcebergTableHandle table = (IcebergTableHandle) handle;
-        org.apache.iceberg.Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
+        Optional<org.apache.iceberg.Table> icebergTable = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
+        if (icebergTable.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + table.getSchemaTableName().toString());
+        }
 
         // Extract identity partition column source ids common to ALL specs
-        Set<Integer> partitionSourceIds = icebergTable.spec().fields().stream()
+        Set<Integer> partitionSourceIds = icebergTable.get().spec().fields().stream()
                 .filter(field -> field.transform().isIdentity())
-                .filter(field -> icebergTable.specs().values().stream().allMatch(spec -> spec.fields().contains(field)))
+                .filter(field -> icebergTable.get().specs().values().stream().allMatch(spec -> spec.fields().contains(field)))
                 .map(PartitionField::sourceId)
                 .collect(toImmutableSet());
 
@@ -760,7 +769,7 @@ public class IcebergMetadata
         if (icebergTable.isEmpty()) {
             throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + handle.getSchemaTableName().toString());
         }
-        return TableStatisticsMaker.getTableStatistics(typeManager, session, constraint, handle, icebergTable.get());
+        return TableStatisticsMaker.getTableStatistics(typeManager, constraint, handle, icebergTable.get());
     }
 
     private Optional<Long> getSnapshotId(org.apache.iceberg.Table table, Optional<Long> snapshotId)
@@ -862,17 +871,21 @@ public class IcebergMetadata
     public ConnectorInsertTableHandle beginRefreshMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle, List<ConnectorTableHandle> sourceTableHandles)
     {
         IcebergTableHandle table = (IcebergTableHandle) tableHandle;
-        org.apache.iceberg.Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
-        transaction = icebergTable.newTransaction();
+        Optional<org.apache.iceberg.Table> icebergTable = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
+        if (icebergTable.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + table.getSchemaTableName().toString());
+        }
+
+        transaction = icebergTable.get().newTransaction();
 
         return new IcebergWritableTableHandle(
             table.getSchemaName(),
             table.getTableName(),
-            SchemaParser.toJson(icebergTable.schema()),
-            PartitionSpecParser.toJson(icebergTable.spec()),
-            getColumns(icebergTable.schema(), typeManager),
-            getDataPath(icebergTable.location()),
-            getFileFormat(icebergTable));
+            SchemaParser.toJson(icebergTable.get().schema()),
+            PartitionSpecParser.toJson(icebergTable.get().spec()),
+            getColumns(icebergTable.get().schema(), icebergTable.get().spec(), typeManager),
+            getDataPath(icebergTable.get().location()),
+            getFileFormat(icebergTable.get()));
     }
 
     @Override
@@ -983,8 +996,12 @@ public class IcebergMetadata
     public Optional<TableToken> getTableToken(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         IcebergTableHandle table = (IcebergTableHandle) tableHandle;
-        org.apache.iceberg.Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
-        return Optional.ofNullable(icebergTable.currentSnapshot())
+        Optional<org.apache.iceberg.Table> icebergTable = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, table.getSchemaTableName());
+        if (icebergTable.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + table.getSchemaTableName().toString());
+        }
+
+        return Optional.ofNullable(icebergTable.get().currentSnapshot())
             .map(snapshot -> new TableToken(snapshot.snapshotId()));
     }
 
@@ -1035,8 +1052,12 @@ public class IcebergMetadata
         }
 
         String storageTableName = materializedViewDefinition.get().getProperties().getOrDefault(STORAGE_TABLE, "").toString();
-        org.apache.iceberg.Table icebergTable = getIcebergTable(metastore, hdfsEnvironment, session, new SchemaTableName(name.getSchemaName(), storageTableName));
-        String dependsOnTables = icebergTable.currentSnapshot().summary().getOrDefault(DEPENDS_ON_TABLES, "");
+        Optional<org.apache.iceberg.Table> icebergTable = icebergUtil.getIcebergTable(metastore, hdfsEnvironment, session, new SchemaTableName(name.getSchemaName(), storageTableName));
+        if (icebergTable.isEmpty()) {
+            throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + new SchemaTableName(name.getSchemaName(), storageTableName).toString());
+        }
+
+        String dependsOnTables = icebergTable.get().currentSnapshot().summary().getOrDefault(DEPENDS_ON_TABLES, "");
         if (!dependsOnTables.isEmpty()) {
             Map<String, String> tableToSnapshotIdMap = Splitter.on(',').withKeyValueSeparator('=').split(dependsOnTables);
             for (Map.Entry<String, String> entry : tableToSnapshotIdMap.entrySet()) {

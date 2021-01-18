@@ -30,11 +30,9 @@ import org.apache.iceberg.TableScan;
 
 import javax.inject.Inject;
 
-import static io.prestosql.plugin.iceberg.ExpressionConverter.toIcebergExpression;
-import static io.prestosql.plugin.iceberg.IcebergUtil.getIcebergTable;
 import java.util.Optional;
 
-import static io.prestosql.plugin.iceberg.IcebergUtil.getTableScan;
+import static io.prestosql.plugin.iceberg.ExpressionConverter.toIcebergExpression;
 import static io.prestosql.spi.StandardErrorCode.TABLE_NOT_FOUND;
 import static java.util.Objects.requireNonNull;
 
@@ -75,7 +73,7 @@ public class IcebergSplitManager
         if (icebergTable.isEmpty()) {
             throw new PrestoException(TABLE_NOT_FOUND, "Table was not found: " + table.getSchemaTableName().toString());
         }
-        TableScan tableScan = icebergTable.newScan()
+        TableScan tableScan = icebergTable.get().newScan()
                 .filter(toIcebergExpression(
                         table.getEnforcedPredicate()
                                 // TODO: Remove TupleDomain#simplify once Iceberg supports IN expression. Currently this

@@ -182,9 +182,6 @@
             <url>http://artifacts.netflix.com/libs-candidates-local</url>
         </repository>
 
-    </repositories>
-
-    <repositories>
         <repository>
             <id>confluent</id>
             <url>http://packages.confluent.io/maven/</url>
@@ -1055,21 +1052,22 @@
                 <version>1.4.200</version>
             </dependency>
 
-            <dependency>
-                <groupId>com.jayway.jsonpath</groupId>
-                <artifactId>json-path</artifactId>
-                <version>2.2.0</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-api</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>net.minidev</groupId>
-                        <artifactId>json-smart</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>com.jayway.jsonpath</groupId>-->
+<!--                <artifactId>json-path</artifactId>-->
+<!--                <version>2.2.0</version>-->
+<!--                <exclusions>-->
+<!--                    <exclusion>-->
+<!--                        <groupId>org.slf4j</groupId>-->
+<!--                        <artifactId>slf4j-api</artifactId>-->
+<!--                    </exclusion>-->
+<!--                    <exclusion>-->
+<!--                        <groupId>net.minidev</groupId>-->
+<!--                        <artifactId>json-smart</artifactId>-->
+<!--                    </exclusion>-->
+<!--                </exclusions>-->
+<!--            </dependency>-->
+<!--            anjali do we need this?-->
 
             <dependency>
                 <groupId>com.linkedin.calcite</groupId>
@@ -1664,29 +1662,6 @@
                 <version>1.26</version>
             </dependency>
 
-            <!-- NETFLIX ONLY DEPENDENCIES -->
-            <dependency>
-                <groupId>netflix</groupId>
-                <artifactId>brotli-codec</artifactId>
-                <version>0.1.8</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.jayway.jsonpath</groupId>
-                <artifactId>json-path</artifactId>
-                <version>2.2.0</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.slf4j</groupId>
-                        <artifactId>slf4j-api</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>net.minidev</groupId>
-                        <artifactId>json-smart</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-
         </dependencies>
     </dependencyManagement>
 
@@ -1774,6 +1749,7 @@
                                     <exclude>com.fasterxml.jackson.core:jackson-core</exclude>
                                     <exclude>com.google.j2objc:j2objc-annotations</exclude>
                                     <exclude>org.scala-lang:scala-library</exclude>
+                                    <exclude>com.google.code.gson:gson</exclude>
                                 </excludes>
                             </requireUpperBoundDeps>
                         </rules>

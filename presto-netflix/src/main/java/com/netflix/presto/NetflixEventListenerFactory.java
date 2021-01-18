@@ -13,12 +13,13 @@
  */
 package com.netflix.presto;
 
-import com.google.common.base.Preconditions;
 import io.airlift.http.client.jetty.JettyHttpClient;
 import io.prestosql.spi.eventlistener.EventListener;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
 
 import java.util.Map;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public class NetflixEventListenerFactory
         implements EventListenerFactory
@@ -44,7 +45,7 @@ public class NetflixEventListenerFactory
 
         synchronized (lock) {
             if (eventListener == null) {
-                Preconditions.checkArgument(config != null && config.containsKey(EVENT_PUBLISH_URI), "No config found for " + EVENT_PUBLISH_URI);
+                checkArgument(config != null && config.containsKey(EVENT_PUBLISH_URI), "No config found for " + EVENT_PUBLISH_URI);
                 // TODO: ideally we want to use guice and inject JettyHttpClient with all of its configuration
                 EventClient eventClient = new EventClient(new JettyHttpClient(), config.get(EVENT_PUBLISH_URI));
                 this.eventListener = new NetflixEventListener(eventClient);

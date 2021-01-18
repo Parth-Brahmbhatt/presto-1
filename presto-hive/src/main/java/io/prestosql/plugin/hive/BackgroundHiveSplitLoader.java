@@ -205,7 +205,6 @@ public class BackgroundHiveSplitLoader
             boolean recursiveDirWalkerEnabled,
             boolean ignoreAbsentPartitions,
             boolean optimizeSymlinkListing,
-            Optional<ValidWriteIdList> validWriteIds),
             Optional<ValidWriteIdList> validWriteIds,
             PrestoHdfsCache prestoHdfsCache,
             boolean isHdfsDeployed)
@@ -664,7 +663,7 @@ public class BackgroundHiveSplitLoader
         FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(hdfsContext, parent);
 
         Map<Path, LocatedFileStatus> fileStatuses = new HashMap<>();
-        HiveFileIterator fileStatusIterator = new HiveFileIterator(table, parent, targetFilesystem, directoryLister, namenodeStats, IGNORED, false);
+        HiveFileIterator fileStatusIterator = new HiveFileIterator(table, parent, targetFilesystem, directoryLister, namenodeStats, IGNORED, false, false, null);
         fileStatusIterator.forEachRemaining(status -> fileStatuses.put(getPathWithoutSchemeAndAuthority(status.getPath()), status));
 
         List<LocatedFileStatus> locatedFileStatuses = new ArrayList<>();

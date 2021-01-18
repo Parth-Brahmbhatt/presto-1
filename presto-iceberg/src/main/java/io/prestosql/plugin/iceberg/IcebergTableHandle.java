@@ -15,8 +15,6 @@ package io.prestosql.plugin.iceberg;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -25,10 +23,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
-import static io.prestosql.plugin.iceberg.TableType.DATA;
-import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static java.lang.Long.parseLong;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class IcebergTableHandle

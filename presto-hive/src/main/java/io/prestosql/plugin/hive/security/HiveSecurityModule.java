@@ -55,8 +55,8 @@ public class HiveSecurityModule
         bindSecurityModule("sql-standard", new SqlStandardSecurityModule());
         bindSecurityModule("allow-all", new AllowAllSecurityModule());
         bindSecurityModule(
-            "netflix",
-            installModules(
+                "netflix",
+                installModules(
                 new NetflixSecurityModule(),
                 new StaticAccessControlMetadataModule()));
     }

@@ -76,7 +76,7 @@ public class IcebergParquetFileWriter
         }
         catch (Exception e) {
            // if (hdfsEnvironment.getConfiguration(hdfsContext, new Path("file://tmp")).get("ignore.iceberg.stats", "false").equals("true")) {
-                return new Metrics((long) 1, new HashMap<>(), new HashMap<>(), new HashMap<>());
+            return new Metrics((long) 1, new HashMap<>(), new HashMap<>(), new HashMap<>());
            // }
            // throw e;
         }

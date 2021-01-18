@@ -53,7 +53,6 @@ public class IcebergMetadataFactory
             HiveMetastore metastore,
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
-            JsonCodec<CommitTaskData> commitTaskCodec)
             JsonCodec<CommitTaskData> commitTaskCodec,
             IcebergConfig icebergConfig,
             IcebergUtil icebergUtil)
