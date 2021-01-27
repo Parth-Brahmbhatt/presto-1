@@ -258,4 +258,10 @@
             <unpack />
         </artifact>
     </artifactSet>
+
+    <artifactSet to="plugin/arrowflight">
+        <artifact id="${project.groupId}:presto-arrowflight:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>

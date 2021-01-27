@@ -84,6 +84,7 @@
         <module>presto-accumulo</module>
         <module>presto-accumulo-iterators</module>
         <module>presto-array</module>
+        <module>presto-arrowflight</module>
         <module>presto-atop</module>
         <module>presto-base-jdbc</module>
         <module>presto-benchmark</module>
@@ -200,6 +201,12 @@
             <dependency>
                 <groupId>io.prestosql</groupId>
                 <artifactId>presto-array</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.prestosql</groupId>
+                <artifactId>presto-arrowflight</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -1666,6 +1673,13 @@
     </dependencyManagement>
 
     <build>
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.6.2</version>
+            </extension>
+        </extensions>
         <pluginManagement>
             <plugins>
                 <plugin>
