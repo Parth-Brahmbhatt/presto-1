@@ -2,12 +2,12 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.prestosql</groupId>
         <version>350</version>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
     <artifactId>presto-arrowflight</artifactId>
     <description>Presto - Arrow Flight Connector</description>
@@ -16,16 +16,6 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
     </properties>
-
-    <build>
-        <extensions>
-            <extension>
-                <groupId>kr.motd.maven</groupId>
-                <artifactId>os-maven-plugin</artifactId>
-                <version>1.6.2</version>
-            </extension>
-        </extensions>
-    </build>
 
     <dependencies>
         <dependency>
@@ -136,5 +126,14 @@
 <!--            <scope>test</scope>-->
 <!--        </dependency>-->
     </dependencies>
+    <build>
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.6.2</version>
+            </extension>
+        </extensions>
+    </build>
 </project>
 
