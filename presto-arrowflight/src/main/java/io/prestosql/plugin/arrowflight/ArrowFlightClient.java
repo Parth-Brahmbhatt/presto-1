@@ -74,6 +74,7 @@ public class ArrowFlightClient
     private Schema schema;
     private VectorSchemaRoot root;
     private SchemaTableName tableName;
+    private final FlightClient.ClientStreamListener listener;
 
     public ArrowFlightClient(SchemaTableName tableName, List<ArrowColumnHandle> columns)
     {
@@ -89,11 +90,6 @@ public class ArrowFlightClient
                 .collect(Collectors.toList());
         this.schema = new Schema(fields);
         this.root = VectorSchemaRoot.create(schema, allocator);
-        //TODO check if a stream already exists with same name on server.
-    }
-
-    public void send(Page page)
-    {
         final FlightDescriptor flightDescriptor;
         try {
             flightDescriptor = FlightDescriptor.path(tableName.getTableName() + getLocalHost().getCanonicalHostName());
@@ -101,7 +97,13 @@ public class ArrowFlightClient
         catch (UnknownHostException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, e);
         }
-        final FlightClient.ClientStreamListener listener = client.startPut(flightDescriptor, root, new AsyncPutListener());
+        this.listener = client.startPut(flightDescriptor, root, new AsyncPutListener());
+        //TODO check if a stream already exists with same name on server, or do that check through getTable
+        // but even than we probably have to check it here depending on server implementation
+    }
+
+    public void send(Page page)
+    {
         final int columnCount = page.getChannelCount();
         final int rowCount = page.getPositionCount();
         root.allocateNew();
@@ -153,14 +155,13 @@ public class ArrowFlightClient
         }
         root.setRowCount(rowCount);
         listener.putNext();
-        listener.completed();
-        listener.getResult();
     }
 
     public void finish()
     {
         root.clear();
-
+        listener.completed();
+        listener.getResult();
         // wait for ack to avoid memory leaks.
         // Uncomment to actually see how many rows were pushed.
 //        FlightInfo info = client.getInfo(FlightDescriptor.path(tableName.getTableName()));
