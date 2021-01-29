@@ -31,8 +31,6 @@ import io.prestosql.spi.type.VarcharType;
 import org.apache.arrow.flight.AsyncPutListener;
 import org.apache.arrow.flight.FlightClient;
 import org.apache.arrow.flight.FlightDescriptor;
-import org.apache.arrow.flight.FlightInfo;
-import org.apache.arrow.flight.FlightStream;
 import org.apache.arrow.flight.Location;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -55,12 +53,16 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.Text;
 
 import java.lang.reflect.InvocationTargetException;
+import java.net.Inet4Address;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.Double.longBitsToDouble;
 import static java.lang.Math.toIntExact;
+import static java.net.InetAddress.getLocalHost;
 import static org.apache.arrow.vector.types.FloatingPointPrecision.DOUBLE;
 import static org.apache.arrow.vector.types.FloatingPointPrecision.SINGLE;
 
@@ -69,7 +71,6 @@ public class ArrowFlightClient
     private List<ArrowColumnHandle> columns;
     private FlightClient client;
     private BufferAllocator allocator;
-    private FlightClient.ClientStreamListener listener;
     private Schema schema;
     private VectorSchemaRoot root;
     private SchemaTableName tableName;
@@ -89,12 +90,18 @@ public class ArrowFlightClient
         this.schema = new Schema(fields);
         this.root = VectorSchemaRoot.create(schema, allocator);
         //TODO check if a stream already exists with same name on server.
-        final FlightDescriptor flightDescriptor = FlightDescriptor.path(tableName.getTableName());
-        this.listener = client.startPut(flightDescriptor, root, new AsyncPutListener());
     }
 
     public void send(Page page)
     {
+        final FlightDescriptor flightDescriptor;
+        try {
+            flightDescriptor = FlightDescriptor.path(tableName.getTableName() + getLocalHost().getCanonicalHostName());
+        }
+        catch (UnknownHostException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, e);
+        }
+        final FlightClient.ClientStreamListener listener = client.startPut(flightDescriptor, root, new AsyncPutListener());
         final int columnCount = page.getChannelCount();
         final int rowCount = page.getPositionCount();
         root.allocateNew();
@@ -110,7 +117,7 @@ public class ArrowFlightClient
                         vector.getClass().getMethod("setNull", int.class).invoke(vector, rowNumber);
                     }
                     catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-                        throw new PrestoException(StandardErrorCode.GENERIC_INTERNAL_ERROR, e);
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, e);
                     }
                 }
 
@@ -146,27 +153,26 @@ public class ArrowFlightClient
         }
         root.setRowCount(rowCount);
         listener.putNext();
+        listener.completed();
+        listener.getResult();
     }
 
     public void finish()
     {
         root.clear();
-        listener.completed();
 
         // wait for ack to avoid memory leaks.
-        listener.getResult();
-
-//        Uncomment to actually see how many rows were pushed.
-        FlightInfo info = client.getInfo(FlightDescriptor.path(tableName.getTableName()));
-        try (final FlightStream stream = client.getStream(info.getEndpoints().get(0).getTicket())) {
-            VectorSchemaRoot newRoot = stream.getRoot();
-            while (stream.next()) {
-                System.out.println(newRoot.getRowCount());
-            }
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        // Uncomment to actually see how many rows were pushed.
+//        FlightInfo info = client.getInfo(FlightDescriptor.path(tableName.getTableName()));
+//        try (final FlightStream stream = client.getStream(info.getEndpoints().get(0).getTicket())) {
+//            while (stream.next()) {
+//                VectorSchemaRoot newRoot = stream.getRoot();
+//                System.out.println(newRoot.getRowCount());
+//            }
+//        }
+//        catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
     }
 
     private FieldVector toArrowVector(ArrowColumnHandle columnHandle)
