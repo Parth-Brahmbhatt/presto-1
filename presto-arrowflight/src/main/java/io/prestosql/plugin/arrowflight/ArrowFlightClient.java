@@ -120,17 +120,17 @@ public class ArrowFlightClient
                         throw new PrestoException(GENERIC_INTERNAL_ERROR, e);
                     }
                 }
-
                 else if (type instanceof IntegerType || type instanceof BigintType) {
                     ((BaseIntVector) vector).setWithPossibleTruncate(rowNumber, (Long) value);
                 }
-
                 else if (type instanceof RealType) {
                     ((FloatingPointVector) vector).setSafeWithPossibleTruncate(rowNumber, longBitsToDouble(toIntExact((long) value)));
                 }
-
                 else if (type instanceof VarcharType) {
                     ((VarCharVector) vector).setSafe(rowNumber, new Text(((Slice) value).toStringUtf8()));
+                }
+                else if (type instanceof DoubleType) {
+                    ((FloatingPointVector) vector).setSafeWithPossibleTruncate(rowNumber, (double) value);
                 }
                 else {
                     throw new UnsupportedOperationException("vector type = " + vector.getClass() + " and presto type = " + type.getDisplayName() + " not supported");
