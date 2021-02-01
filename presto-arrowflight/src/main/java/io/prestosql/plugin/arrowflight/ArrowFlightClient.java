@@ -16,7 +16,6 @@ package io.prestosql.plugin.arrowflight;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
@@ -53,7 +52,6 @@ import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.arrow.vector.util.Text;
 
 import java.lang.reflect.InvocationTargetException;
-import java.net.Inet4Address;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -128,28 +126,15 @@ public class ArrowFlightClient
                 }
 
                 else if (type instanceof RealType) {
-                    ((FloatingPointVector) vector).setWithPossibleTruncate(rowNumber, longBitsToDouble(toIntExact((long) value)));
+                    ((FloatingPointVector) vector).setSafeWithPossibleTruncate(rowNumber, longBitsToDouble(toIntExact((long) value)));
                 }
 
                 else if (type instanceof VarcharType) {
-                    ((VarCharVector) vector).set(rowNumber, new Text(((Slice) value).toStringUtf8()));
+                    ((VarCharVector) vector).setSafe(rowNumber, new Text(((Slice) value).toStringUtf8()));
                 }
                 else {
                     throw new UnsupportedOperationException("vector type = " + vector.getClass() + " and presto type = " + type.getDisplayName() + " not supported");
                 }
-
-//                if (vector instanceof BaseIntVector) {
-//                    ((BaseIntVector) vector).setWithPossibleTruncate(rowNumber, (Long) value);
-//                }
-//                else if (vector instanceof FloatingPointVector) {
-//                    ((FloatingPointVector) vector).setWithPossibleTruncate(rowNumber, (Double) value);
-//                }
-//                else if (vector instanceof VarCharVector) {
-//                    ((VarCharVector) vector).set(rowNumber, new Text(((Slice) value).toStringUtf8()));
-//                }
-//                else {
-//                    throw new UnsupportedOperationException(vector.getClass() + " not supported");
-//                }
             }
             vector.setValueCount(rowCount);
         }
@@ -258,7 +243,7 @@ public class ArrowFlightClient
         }
         if (type instanceof DecimalType) {
             DecimalType decimalType = ((DecimalType) type);
-            return Field.nullablePrimitive(columnHandle.getColumnName(), new ArrowType.Decimal(decimalType.getPrecision(), decimalType.getScale()));
+            return Field.nullablePrimitive(columnHandle.getColumnName(), new ArrowType.Decimal(decimalType.getPrecision(), decimalType.getScale(), 128));
         }
         if (type instanceof VarcharType) {
             return Field.nullablePrimitive(columnHandle.getColumnName(), ArrowType.Utf8.INSTANCE);
