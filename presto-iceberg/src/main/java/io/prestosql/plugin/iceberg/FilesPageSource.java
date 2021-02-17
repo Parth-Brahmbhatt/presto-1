@@ -170,15 +170,16 @@ public class FilesPageSource
                     int partitionIndex = Math.abs(id - LAST_METADATA_INDEX) - 1;
                     if (partition.size() < partitionIndex) {
                         pageListBuilder.appendNull();
-                    } else {
+                    }
+                    else {
                         final BlockBuilder blockBuilder = pageListBuilder.nextColumn();
                         writeNativeValue(
                                 columnHandle.getType(),
                                 blockBuilder,
                                 convert(partition.get(partitionIndex, icebergType.typeId().javaClass()), icebergType));
                     }
-
-                } else {
+                }
+                else {
                     final Object value = valueMap.getOrDefault(id, null);
                     if (value instanceof Collection) {
                         writeArray((List) value, ((ArrayType) columnHandle.getType()).getElementType(), pageListBuilder.nextColumn());
@@ -188,9 +189,6 @@ public class FilesPageSource
                     }
                 }
             }
-
-
-
 //        while (dataFileIterator.hasNext()) {
 //            DataFile dataFile = dataFileIterator.next();
 //

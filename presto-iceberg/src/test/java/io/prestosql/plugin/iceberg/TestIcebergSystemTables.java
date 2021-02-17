@@ -179,7 +179,7 @@ public class TestIcebergSystemTables
                         "('key_metadata', 'varbinary', '', '')," +
                         "('split_offsets', 'array(bigint)', '', '')," +
                         "('_bigint', 'row(column_size bigint, value_counts bigint, null_value_counts bigint, lower_bound bigint, upper_bound bigint)', '', '')," +
-                        "('_date', 'row(column_size bigint, value_counts bigint, null_value_counts bigint, lower_bound date, upper_bound date)', '', '')");
+                        "('_date', 'date', '', '')");
         assertQuerySucceeds("SELECT * FROM test_schema.\"test_table$files\"");
 
         assertQuery("SHOW COLUMNS FROM test_schema.\"test_table_unpartitioned$files\"",

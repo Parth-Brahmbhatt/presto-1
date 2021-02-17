@@ -22,12 +22,12 @@ import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.RowType.Field;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
-import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -61,14 +61,14 @@ public class FilesTable
     public FilesTable(Schema schema, PartitionSpec partitionSpec, TypeManager typeManager)
     {
         ImmutableList.Builder<IcebergColumnHandle> columnHandleBuilder = new ImmutableList.Builder<IcebergColumnHandle>()
-        .add(FILE_PATH)
-        .add(FILE_FORMAT)
-        .add(RECORD_COUNT)
-        .add(FILE_SIZE_IN_BYTES)
-        .add(FILE_ORDINAL)
-        .add(SORT_COLUMNS)
-        .add(KEY_METADATA)
-        .add(SPLIT_OFFSETS);
+                .add(FILE_PATH)
+                .add(FILE_FORMAT)
+                .add(RECORD_COUNT)
+                .add(FILE_SIZE_IN_BYTES)
+                .add(FILE_ORDINAL)
+                .add(SORT_COLUMNS)
+                .add(KEY_METADATA)
+                .add(SPLIT_OFFSETS);
 
         List<Field> fields = ImmutableList.of(
                 new Field(Optional.of(COLUMN_SIZE), BIGINT),
@@ -91,20 +91,21 @@ public class FilesTable
                     columnHandleBuilder.add(columnHandle);
                 });
 
-        List<String> partitionColumnNames = IcebergUtil.partitionColumnNames(schema, partitionSpec);
-        for (int i = 0; i < partitionColumnNames.size(); i++) {
+        Map<String, Type> partitionColumns = IcebergUtil.toPartitionColumnMap(schema, partitionSpec, typeManager);
+        int i = 0;
+        for (Map.Entry<String, Type> nameToTypeEntry : partitionColumns.entrySet()) {
             int index = LAST_METADATA_INDEX - i - 1;
-            PartitionField field = partitionSpec.fields().get(i);
             columnHandleBuilder.add(
                     new IcebergColumnHandle(
                             index,
-                            partitionColumnNames.get(i),
-                            toPrestoType(field.transform().getResultType(schema.findType(field.sourceId())), typeManager),
+                            nameToTypeEntry.getKey(),
+                            nameToTypeEntry.getValue(),
                             Optional.empty()));
+            i++;
         }
 
         columnHandles = columnHandleBuilder.build().stream()
-            .filter(columnHandle -> columnHandle.getId() < 0 || !partitionColumnNames.contains(columnHandle.getName()))
+            .filter(columnHandle -> columnHandle.getId() < 0 || !partitionColumns.containsKey(columnHandle.getName()))
             .collect(Collectors.toUnmodifiableList());
     }
 
