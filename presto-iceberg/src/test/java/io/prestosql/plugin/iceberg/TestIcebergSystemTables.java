@@ -36,6 +36,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -119,6 +120,21 @@ public class TestIcebergSystemTables
         assertEquals(rowsByPartition.get(LocalDate.parse("2019-09-08")).getField(4), new MaterializedRow(DEFAULT_PRECISION, 0L, 0L, 0L));
         assertEquals(rowsByPartition.get(LocalDate.parse("2019-09-09")).getField(4), new MaterializedRow(DEFAULT_PRECISION, 1L, 3L, 0L));
         assertEquals(rowsByPartition.get(LocalDate.parse("2019-09-10")).getField(4), new MaterializedRow(DEFAULT_PRECISION, 4L, 5L, 0L));
+
+        assertQuerySucceeds("SELECT * FROM test_schema.\"test_table_unpartitioned$partitions\"");
+        assertQuery("SHOW COLUMNS FROM test_schema.\"test_table_unpartitioned$partitions\"",
+                "VALUES " +
+                        "('row_count', 'bigint', '', '')," +
+                        "('file_count', 'bigint', '', '')," +
+                        "('total_size', 'bigint', '', '')," +
+                        "('_bigint', 'row(min bigint, max bigint, null_count bigint)', '', '')," +
+                        "('_date', 'row(min date, max date, null_count bigint)', '', '')");
+        final MaterializedResult rows = computeActual("SELECT * FROM test_schema.\"test_table_unpartitioned$partitions\"");
+        assertEquals(rows.getRowCount(), 1);
+        assertEquals(rows.getMaterializedRows().get(0).getField(0), 3L);
+        assertEquals(rows.getMaterializedRows().get(0).getField(1), 1L);
+        assertEquals(rows.getMaterializedRows().get(0).getField(3), new MaterializedRow(DEFAULT_PRECISION,0L, 2L, 0L));
+        assertEquals(rows.getMaterializedRows().get(0).getField(4), new MaterializedRow(DEFAULT_PRECISION,LocalDate.parse("2019-09-08"), LocalDate.parse("2019-09-09"), 0L));
     }
 
     @Test

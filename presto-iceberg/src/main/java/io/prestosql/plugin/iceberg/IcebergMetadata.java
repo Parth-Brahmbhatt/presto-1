@@ -214,12 +214,6 @@ public class IcebergMetadata
     public IcebergTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
         IcebergTableName name = IcebergTableName.from(tableName.getTableName());
-        System.err.println("=====================");
-        System.err.println("=====================");
-        System.err.println(tableName);
-        System.err.println(name);
-        System.err.println("=====================");
-        System.err.println("=====================");
         Optional<Table> hiveTable = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), name.getTableName());
         if (hiveTable.isEmpty()) {
             return null;
@@ -355,7 +349,7 @@ public class IcebergMetadata
         for (SchemaTableName table : tables) {
             try {
                 final IcebergTableHandle tableHandle = getTableHandle(session, table);
-                if (tableHandle.getTableType().equals(DATA) || tableHandle.getTableType().equals(FILES)) {
+                if (tableHandle != null && tableHandle.getTableType().equals(DATA) || tableHandle.getTableType().equals(FILES)) {
                     columns.put(table, getTableMetadata(session, tableHandle).getColumns());
                 }
             }
@@ -989,7 +983,7 @@ public class IcebergMetadata
             partitionColumnMap.entrySet().stream()
                     .forEach(entry -> viewColumnBuilder.add(new ViewColumn(entry.getKey(), entry.getValue().getTypeId())));
 
-            final String partitionColumns = partitionColumnMap.keySet().stream().collect(joining(","));
+            final String partitionColumns = partitionColumnMap.keySet().stream().collect(joining(",","",","));
             final String dataColumnFormat = "min(%s.lower_bound) as min_%s, max(%s.upper_bound) as max_%s, sum(%s.null_value_counts) as null_count_%s";
             final String dataOuterFormat = "cast(ROW(min_%s,max_%s,null_count_%s) as ROW(min %s,max %s, null_count BIGINT)) as %s";
             final List<NestedField> dataColumns = schema.columns().stream()
@@ -1015,16 +1009,23 @@ public class IcebergMetadata
 
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.append(" SELECT ");
-            stringBuilder.append(partitionColumns);
-            stringBuilder.append(" ,ROW_COUNT, FILE_COUNT, TOTAL_SIZE, ");
+            if (!partitionColumnMap.isEmpty()) {
+                stringBuilder.append(partitionColumns);
+            }
+            stringBuilder.append(" ROW_COUNT, FILE_COUNT, TOTAL_SIZE, ");
             stringBuilder.append(dataOuterSelect);
             stringBuilder.append(" FROM ( SELECT ");
-            stringBuilder.append(partitionColumns);
-            stringBuilder.append(" ,SUM(RECORD_COUNT) AS ROW_COUNT,COUNT (DISTINCT FILE_PATH) FILE_COUNT,SUM(FILE_SIZE_IN_BYTES) AS TOTAL_SIZE, ");
+            if (!partitionColumnMap.isEmpty()) {
+                stringBuilder.append(partitionColumns);
+            }
+            stringBuilder.append(" SUM(RECORD_COUNT) AS ROW_COUNT,COUNT (DISTINCT FILE_PATH) FILE_COUNT,SUM(FILE_SIZE_IN_BYTES) AS TOTAL_SIZE, ");
             stringBuilder.append(dataInnerSelect);
             stringBuilder.append(" FROM " + viewName.getSchemaName() + ".\"" + icebergTableName.getTableName() + "$FILES\" ");
-            stringBuilder.append(" GROUP BY ");
-            stringBuilder.append(partitionColumns);
+            if (!partitionColumnMap.isEmpty()) {
+                stringBuilder.append(" GROUP BY ");
+                stringBuilder.append(partitionColumns, 0, partitionColumns.length() - 1);
+            }
+
             stringBuilder.append(")");
 
             final String viewSqlText = stringBuilder.toString();
