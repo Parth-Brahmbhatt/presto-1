@@ -19,7 +19,6 @@ import io.trino.matching.Pattern;
 import io.trino.plugin.jdbc.JdbcColumnHandle;
 import io.trino.plugin.jdbc.JdbcExpression;
 import io.trino.plugin.jdbc.JdbcTypeHandle;
-import io.trino.plugin.jdbc.expression.AggregateFunctionPatterns;
 import io.trino.plugin.jdbc.expression.AggregateFunctionRule;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.expression.Variable;
@@ -32,9 +31,9 @@ import static io.trino.matching.Capture.newCapture;
 import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.basicAggregation;
 import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.expressionType;
 import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.functionName;
+import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.outputType;
 import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.singleInput;
 import static io.trino.plugin.jdbc.expression.AggregateFunctionPatterns.variable;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 //TODO Move this class to base-jdbc module and update all jdbc connectors to leverage it.
@@ -80,7 +79,7 @@ public class SingleInputAggregateFunction
         verifyNotNull(columnHandle, "Unbound variable: %s", input);
         String expressionFormat = expression.orElse(prestoName + "(%s)");
         return Optional.of(new JdbcExpression(
-                expressionFormat.replaceAll("%s", columnHandle.toSqlExpression(context.getIdentifierQuote())),
+                expressionFormat.replaceAll("%s", columnHandle.getColumnName()),
                 jdbcTypeHandle.orElse(columnHandle.getJdbcTypeHandle())));
     }
 

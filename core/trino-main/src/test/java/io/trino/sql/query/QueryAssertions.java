@@ -42,7 +42,6 @@ import org.intellij.lang.annotations.Language;
 import java.io.Closeable;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -255,6 +254,7 @@ public class QueryAssertions
         private final String query;
         private boolean ordered;
         private boolean skipTypesCheck;
+        private List<Double> tolerancePercentages;
 
         static AssertProvider<QueryAssert> newQueryAssert(String query, QueryRunner runner, Session session)
         {
@@ -282,6 +282,18 @@ public class QueryAssertions
             return this;
         }
 
+        /**
+         * Each element in index represents allowed tolerance percentage for that column, if tolerance is 0, null or not
+         * provided (i.e. results have 5 column but this list only has 3 values) for a column index than only exact matches will be done.
+         * @param tolerancePercentages
+         * @return
+         */
+        public QueryAssert withTolerancePercentages(List<Double> tolerancePercentages)
+        {
+            this.tolerancePercentages = tolerancePercentages;
+            return this;
+        }
+
         public QueryAssert skippingTypesCheck()
         {
             skipTypesCheck = true;
@@ -296,11 +308,6 @@ public class QueryAssertions
 
         public QueryAssert matches(MaterializedResult expected)
         {
-            return matches(expected, List.of());
-        }
-
-        private QueryAssert matches(MaterializedResult expected, List<Optional<Number>> tolerances)
-        {
             return satisfies(actual -> {
                 if (!skipTypesCheck) {
                     assertTypes(actual, expected.getTypes());
@@ -310,13 +317,17 @@ public class QueryAssertions
                         .as("Rows")
                         .withRepresentation(ROWS_REPRESENTATION);
 
+                if (!ordered && tolerancePercentages != null) {
+                    throw new UnsupportedOperationException("can not support inexact matches with unordered results.");
+                }
+
                 if (ordered) {
-                    if (tolerances != null && !tolerances.isEmpty()) {
+                    if (tolerancePercentages != null) {
                         IntStream.range(0, actual.getRowCount())
                                 .forEach(row -> {
                                     MaterializedRow actualRow = actual.getMaterializedRows().get(row);
                                     MaterializedRow expectedRow = expected.getMaterializedRows().get(row);
-                                    matchWithTolerance(actualRow, expectedRow, tolerances);
+                                    matchWithTolerance(actualRow, expectedRow, tolerancePercentages);
                                 });
                     }
                     else {
@@ -324,9 +335,6 @@ public class QueryAssertions
                     }
                 }
                 else {
-                    if (tolerances != null && !tolerances.isEmpty()) {
-                        throw new UnsupportedOperationException("can not support in exact matches with unordered results.");
-                    }
                     assertion.containsExactlyInAnyOrderElementsOf(expected.getMaterializedRows());
                 }
             });
@@ -375,7 +383,7 @@ public class QueryAssertions
                     .isEqualTo(expectedTypes);
         }
 
-        private void matchWithTolerance(MaterializedRow actualRow, MaterializedRow expectedRow, List<Optional<Number>> tolerances)
+        private void matchWithTolerance(MaterializedRow actualRow, MaterializedRow expectedRow, List<Double> tolerancePercentages)
         {
             assertEquals(actualRow.getFieldCount(), expectedRow.getFieldCount());
 
@@ -384,29 +392,14 @@ public class QueryAssertions
                         Object actualRowField = actualRow.getField(fieldIndex);
                         Object expectedRowField = expectedRow.getField(fieldIndex);
 
-                        if (tolerances.get(fieldIndex).isPresent()) {
-                            Number tolerance = tolerances.get(fieldIndex).get();
+                        if (tolerancePercentages.size() >= fieldIndex && tolerancePercentages.get(fieldIndex) != null) {
+                            Double tolerance = tolerancePercentages.get(fieldIndex);
                             assertTrue(expectedRowField instanceof Number && expectedRowField instanceof Comparable,
                                     "tolerance is specified for the column but column is not a number and comparable " + expectedRowField);
 
-                            Range range = null;
-                            if (tolerance instanceof Integer) {
-                                range = Range.open(((Number) expectedRowField).intValue() - (Integer) tolerance, ((Number) expectedRowField).intValue() + (Integer) tolerance);
-                            }
-                            else if (tolerance instanceof Long) {
-                                range = Range.open(((Number) expectedRowField).longValue() - (Long) tolerance, ((Number) expectedRowField).longValue() + (Long) tolerance);
-                            }
-                            else if (tolerance instanceof Float) {
-                                range = Range.open(((Number) expectedRowField).floatValue() - (Float) tolerance, ((Number) expectedRowField).floatValue() + (Float) tolerance);
-                            }
-                            else if (tolerance instanceof Double) {
-                                range = Range.open(((Number) expectedRowField).doubleValue() - (Double) tolerance, ((Number) expectedRowField).doubleValue() + (Double) tolerance);
-                            }
-                            else {
-                                fail("tolerance can only be of Integer, Long, Float or Double Types but found " + tolerance.getClass());
-                            }
-
-                            if (!range.contains((Comparable) actualRowField)) {
+                            Double percentageValue = (((Number) expectedRowField).doubleValue() * tolerance) / 100;
+                            Range range = Range.open(((Number) expectedRowField).doubleValue() - percentageValue, ((Number) expectedRowField).doubleValue() + percentageValue);
+                            if (!range.contains(((Number) actualRowField).doubleValue())) {
                                 fail("row " + actualRow + " has field " + actualRowField + " that is not contained in expected actual range " + range);
                             }
                         }
@@ -428,18 +421,18 @@ public class QueryAssertions
          */
         public QueryAssert isFullyPushedDown()
         {
-            return isCorrectlyPushedDown(List.of());
+            return isCorrectlyPushedDown();
         }
 
         /**
          * Verifies query is fully pushed down and verifies the results are the same as when the pushdown is disabled.
          */
-        public QueryAssert isCorrectlyPushedDown(List<Optional<Number>> tolerances)
+        public QueryAssert isCorrectlyPushedDown()
         {
             checkState(!(runner instanceof LocalQueryRunner), "testIsFullyPushedDown() currently does not work with LocalQueryRunner");
 
             // Compare the results with pushdown disabled, so that explicit matches() call is not needed
-            verifyResultsWithPushdownDisabled(tolerances);
+            verifyResultsWithPushdownDisabled();
 
             transaction(runner.getTransactionManager(), runner.getAccessControl())
                     .execute(session, session -> {
@@ -503,15 +496,10 @@ public class QueryAssertions
 
         private void verifyResultsWithPushdownDisabled()
         {
-            verifyResultsWithPushdownDisabled(List.of());
-        }
-
-        private void verifyResultsWithPushdownDisabled(List<Optional<Number>> tolerances)
-        {
             Session withoutPushdown = Session.builder(session)
                     .setSystemProperty("allow_pushdown_into_connectors", "false")
                     .build();
-            matches(runner.execute(withoutPushdown, query), tolerances);
+            matches(runner.execute(withoutPushdown, query));
         }
     }
 
