@@ -35,6 +35,7 @@ import io.trino.plugin.jdbc.expression.AggregateFunctionRewriter;
 import io.trino.plugin.jdbc.expression.AggregateFunctionRule;
 import io.trino.plugin.jdbc.expression.ImplementCount;
 import io.trino.plugin.jdbc.expression.ImplementCountAll;
+import io.trino.plugin.jdbc.mapping.IdentifierMapping;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.ColumnHandle;
@@ -85,17 +86,16 @@ public class DruidJdbcClient
     private AggregateFunctionRewriter aggregateFunctionRewriter;
 
     @Inject
-    public DruidJdbcClient(BaseJdbcConfig config, ConnectionFactory connectionFactory)
+    public DruidJdbcClient(BaseJdbcConfig config, ConnectionFactory connectionFactory, IdentifierMapping identifierMapping)
     {
-        super(config, "\"", connectionFactory);
-
+        super(config, "\"", connectionFactory, identifierMapping);
         this.aggregateFunctionRewriter = new AggregateFunctionRewriter(
                 this::quoted,
                 aggregateFunctionRules());
     }
 
     @Override
-    protected Collection<String> listSchemas(Connection connection)
+    public Collection<String> listSchemas(Connection connection)
     {
         return ImmutableList.of(DRUID_SCHEMA);
     }
@@ -146,7 +146,7 @@ public class DruidJdbcClient
      * how tables are filtered.
      */
     @Override
-    protected ResultSet getTables(Connection connection, Optional<String> schemaName, Optional<String> tableName)
+    public ResultSet getTables(Connection connection, Optional<String> schemaName, Optional<String> tableName)
             throws SQLException
     {
         DatabaseMetaData metadata = connection.getMetaData();
